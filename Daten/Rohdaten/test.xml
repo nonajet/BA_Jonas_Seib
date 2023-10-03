@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<measurement>
+	<type>dog_floor</type>
+	<program>Animal Analysis Suite</program>
+	<program_version>2.6.20</program_version>
+	<format_version>1.0</format_version>
+	<measuring_system>line.pressure;type.input.matrix.pressure;device.zebris.fdm.MF001:1243021.00112217.usbMF001:1243021.00122217.usb;
+line.sync.0;type.input.digital;device.zebris.fdm.MF001:1243021.00112217.usbMF001:1243021.00122217.usb;
+line.sync.1;type.input.digital;device.zebris.fdm.MF001:1243021.00112217.usbMF001:1243021.00122217.usb;
+</measuring_system>
+	<patient>
+		<first_name>Lico</first_name>
+		<last_name>Domeyer</last_name>
+		<born>2011-06-01</born>
+		<sex>male</sex>
+		<code/>
+	</patient>
+	<measured>2023-06-22T10:52:49.896Z</measured>
+	<description>Domeyer, Lico - Schritt</description>
+	<cell_count>
+		<x>64</x>
+		<y>481</y>
+	</cell_count>
+	<movements>
+		<movement>
+			<type>forward</type>
+			<id>gait_1</id>
+			<clips>
+				<clip>
+					<type>matrix</type>
+					<id>pressure_matrix.treadmill.1</id>
+					<begin>0.000</begin>
+					<frequency>200</frequency>
+					<count>1589</count>
+					<units>N/cm²</units>
+					<cell_count>
+						<x>64</x>
+						<y>481</y>
+					</cell_count>
+					<cell_size>
+						<x>8.4688</x>
+						<y>8.4688</y>
+					</cell_size>
+					<data>
+						<quant>
+							<cell_begin>
+								<x>37</x>
+								<y>0</y>
+							</cell_begin>
+							<cell_count>
+								<x>6</x>
+								<y>2</y>
+							</cell_count>
+							<cells>
+								1.1 6.3 3.4 1.1 1.7 0.0
+								2.9 9.7 5.7 5.7 7.4 1.1
+							</cells>
+						</quant>
+						<quant>
+							<cell_begin>
+								<x>13</x>
+								<y>470</y>
+							</cell_begin>
+							<cell_count>
+								<x>4</x>
+								<y>4</y>
+							</cell_count>
+							<cells>
+								0.0 0.0 0.0 1.1
+								0.0 1.1 5.7 6.3
+								4.0 5.1 5.1 5.1
+								2.9 3.4 0.0 0.0
+							</cells>
+						</quant>
+						<quant>
+							<cell_begin>
+								<x>13</x>
+								<y>470</y>
+							</cell_begin>
+							<cell_count>
+								<x>4</x>
+								<y>3</y>
+							</cell_count>
+							<cells>
+								0.0 0.6 5.1 4.6
+								3.4 4.0 4.0 4.0
+								2.3 2.3 0.0 0.0
+							</cells>
+						</quant>
+						<quant>
+							<cell_begin>
+								<x>13</x>
+								<y>470</y>
+							</cell_begin>
+							<cell_count>
+								<x>4</x>
+								<y>3</y>
+							</cell_count>
+							<cells>
+								0.0 0.0 4.0 3.4
+								2.3 2.9 2.3 2.9
+								1.1 1.1 0.0 0.0
+							</cells>
+						</quant>
+					</data>
+				</clip>
+			</clips>
+		</movement>
+	</movements>
+</measurement>
