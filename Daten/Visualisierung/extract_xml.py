@@ -1,7 +1,8 @@
 import xml.etree.ElementTree as et
 
-import numpy as np
 import matplotlib.pyplot as plt
+
+from feature_comp import *
 
 NS = {'zb': 'http://www.zebris.de/measurements'}
 
@@ -79,11 +80,13 @@ def visualize(filepath, id):
     for mx in matrix:
         if mx and mx_ctr % 5 == 0:
             mx_np = np.array(mx)
+            paw_ctr, paw_loc = paw_recognition(mx_np)
+            print('dog has %i paw(s)' % paw_ctr)
 
             # local
             ax_local.imshow(
                 np.flipud(np.fliplr(mx_np)))  # rotate 180° to fit vertical direction of matrix to global view
-            ax_local.set_axis_off()
+            # ax_local.set_axis_off()
 
             # global
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
