@@ -65,11 +65,15 @@ def visualize(filepath, id):
     plt.ion()
 
     ax_local = ax[0]
+    ax_local.set_title('local')
 
     ax_global = ax[1]
+    ax_global.set_title('global')
 
     ax_total = ax[2]
     total_mx = np.zeros((481, 64))
+
+    plt.axis('off')
 
     mx_ctr = 0
     for mx in matrix:
@@ -77,24 +81,21 @@ def visualize(filepath, id):
             mx_np = np.array(mx)
 
             # local
-            ax_local.matshow(np.flipud(np.fliplr(mx_np)))
+            ax_local.imshow(
+                np.flipud(np.fliplr(mx_np)))  # rotate 180° to fit vertical direction of matrix to global view
+            ax_local.set_axis_off()
 
             # global
-            ax_global.set_xlim([0, 63])
-            ax_global.set_ylim([0, 480])
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
             ax_global.matshow(global_mx)
+            ax_global.set_xticks([])
+            # ax_global.set_yticks([])
 
-            # total
-            ax_total.set_xlim([0, 63])
-            ax_total.set_ylim([0, 480])
-            total_mx += global_mx
-            ax_total.matshow(total_mx)
+            # total (drains performance heavily)
+            # total_mx += global_mx
+            # ax_total.matshow(total_mx)
 
             plt.pause(0.0001)
-            ax_global.clear()
-            ax_local.clear()
-            ax_total.clear()
         mx_ctr += 1
 
     print(
@@ -120,4 +121,4 @@ def create_global_mx(local_mx, offset):
 
 if __name__ == '__main__':
     filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0307068 Trab.xml'
-    visualize(filep, 'gait_3')
+    visualize(filep, 'gait_2')

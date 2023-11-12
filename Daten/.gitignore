@@ -78,7 +78,7 @@ fabric.properties
 
 
 # added ignores
-/__*
-/PDF
-**/Rohdaten*
-.idea
+__*/
+PDF/
+Rohdaten/
+Ganganalyse Alle.ods
