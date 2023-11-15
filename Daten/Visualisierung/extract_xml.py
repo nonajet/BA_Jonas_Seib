@@ -78,10 +78,11 @@ def visualize(filepath, id):
 
     mx_ctr = 0
     for mx in matrix:
-        if mx and mx_ctr % 5 == 0:
+        if mx and mx_ctr % 10 == 0:
             mx_np = np.array(mx)
             paw_ctr, paw_loc = paw_recognition(mx_np)
             print('dog has %i paw(s)' % paw_ctr)
+            vis_paws(paw_loc)
 
             # local
             ax_local.imshow(
@@ -98,12 +99,28 @@ def visualize(filepath, id):
             # total_mx += global_mx
             # ax_total.matshow(total_mx)
 
-            plt.pause(0.0001)
+            plt.pause(0.00001)
         mx_ctr += 1
 
     print(
         '############################################\nmovement (%s) '
         'finished\n############################################' % id)
+
+
+def vis_paws(paw_location):
+    fig, axes = plt.subplots(2, 2)
+    ax_fl = axes[0]
+    ax_fl.set_title('front left')
+    ax_fr = axes[1]
+    ax_fr.set_title('front right')
+    ax_bl = axes[2]
+    ax_bl.set_title('back left')
+    ax_br = axes[3]
+    ax_br.set_title('back right')
+
+
+
+    plt.axis('off')
 
 
 def create_global_mx(local_mx, offset):
