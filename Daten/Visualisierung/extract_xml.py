@@ -62,27 +62,31 @@ def extract_matrices(filepath, id):
 
 def visualize(filepath, id):
     matrix, offset = extract_matrices(filepath, id)
-    fig, ax = plt.subplots(1, 3)
+    fig, ax = plt.subplots(2, 4)
     plt.ion()
 
-    ax_local = ax[0]
+    ax_local = ax[0][0]
     ax_local.set_title('local')
 
-    ax_global = ax[1]
+    ax_global = ax[0][1]
     ax_global.set_title('global')
 
-    ax_total = ax[2]
-    total_mx = np.zeros((481, 64))
+    # ax_total = ax[2]
+    # total_mx = np.zeros((481, 64))
 
     plt.axis('off')
+    fig_paws, axes_paws = plt.subplots(2, 2)
+    plt.figure(fig_paws)
+    fig_paws.canvas.manager.window.wm_geometry("+%d+%d" % (100000, 100000))
 
     mx_ctr = 0
     for mx in matrix:
-        if mx and mx_ctr % 10 == 0:
+        if mx and mx_ctr % 5 == 0:
             mx_np = np.array(mx)
             paw_ctr, paw_loc = paw_recognition(mx_np)
+
             print('dog has %i paw(s)' % paw_ctr)
-            vis_paws(paw_loc)
+            vis_paws(fig_paws, axes_paws)
 
             # local
             ax_local.imshow(
@@ -107,20 +111,20 @@ def visualize(filepath, id):
         'finished\n############################################' % id)
 
 
-def vis_paws(paw_location):
-    fig, axes = plt.subplots(2, 2)
-    ax_fl = axes[0]
-    ax_fl.set_title('front left')
-    ax_fr = axes[1]
-    ax_fr.set_title('front right')
-    ax_bl = axes[2]
-    ax_bl.set_title('back left')
-    ax_br = axes[3]
-    ax_br.set_title('back right')
+def vis_paws(figure, axes):
+    plt.ion()
+    plt.figure(figure)
 
-
+    for paw_name, paw_obj in vars(TheDog).items():
+        if paw_obj.ground:
+            axes[paw_obj.ax_ind].matshow(paw_obj.area)
+        else:
+            # axes[paw_obj.ax_ind].set_xlim(0, 1)
+            # axes[paw_obj.ax_ind].set_ylim(0, 1)
+            axes[paw_obj.ax_ind].set_title(paw_name)
 
     plt.axis('off')
+    plt.pause(0.0001)
 
 
 def create_global_mx(local_mx, offset):

@@ -1,24 +1,36 @@
 import traceback
 import warnings
+from pprint import pprint
 
-import numpy
 import numpy as np
 from scipy.ndimage import label
 
 
+class Dog(object):
+    pass
+
+    def __init__(self, front_left, front_right, back_left, back_right):
+        self.fl = front_left
+        self.fr = front_right
+        self.bl = back_left
+        self.br = back_right
+
+
 class Paw(object):
-    def __init__(self, start_index, front, right, area, ground=False):
+    def __init__(self, start_index, front, right, area, ax_ind, ground=False):
         self.start_index = start_index
-        self.front = front
-        self.r = right
+        # self.front = front
+        # self.r = right
         self.area = area
         self.ground = ground
+        self.ax_ind = ax_ind
 
 
-FR = Paw((-1, -1), True, True, [])
-FL = Paw((-1, -1), True, False, [])
-BR = Paw((-1, -1), False, True, [])
-BL = Paw((-1, -1), False, False, [])
+FL = Paw((-1, -1), True, False, [[]], (0, 0))
+FR = Paw((-1, -1), True, True, [[]], (0, 1))
+BL = Paw((-1, -1), False, False, [[]], (1, 0))
+BR = Paw((-1, -1), False, True, [[]], (1, 1))
+TheDog = Dog(FL, FR, BL, BR)
 
 
 def paw_recognition(matrix):
@@ -27,18 +39,56 @@ def paw_recognition(matrix):
     :param matrix:
     :return: number of paws and their left uppermost index
     """
-    paws, start_ind, labeled_mx = find_nzero_clusters(matrix, 4)
+    paws, start_ind, labeled_mx = find_nzero_clusters(matrix, 3)
     if len(paws) != len(start_ind): warnings.warn('no. of paws does not match no. of paw starting points')
 
-    if len(paws) < 0 or len(paws) > 4:
-        warnings.warn('Dog has too few or many paws!')
+    paw_count = len(paws)
+    print('paws:', paws)
+    print(start_ind)
+    if paw_count == 0:
+        print('%i paws' % paw_count)
+        pass
+    elif paw_count == 1:
+        print('%i paw' % paw_count)
+        pass
+    elif paw_count == 2:
+        front = min(start_ind)  # first distinction b/w front <=> back paw (smaller row means front)
+        back = max(start_ind)
+        if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
+            FL.start_index = front
+            FL.ground = True
+            FL.area = [get_paw_area(matrix, labeled_mx, labeled_mx[FL.start_index])]
+            FR.ground = False
+
+            BR.start_index = back
+            BR.ground = True
+            BR.area = [get_paw_area(matrix, labeled_mx, labeled_mx[BR.start_index])]
+            BL.ground = False
+        else:
+            FR.start_index = front
+            FR.ground = True
+            FR.area = [get_paw_area(matrix, labeled_mx, labeled_mx[FR.start_index])]
+            FL.ground = False
+
+            BL.start_index = back
+            BL.ground = True
+            BL.area = [get_paw_area(matrix, labeled_mx, labeled_mx[BL.start_index])]
+            BR.ground = False
+    elif paw_count == 3:
+        print('%i paws' % paw_count)
+        pass
+    elif paw_count == 4:
+        print('dog stays still (4 paws on ground)')
     else:
-        print(start_ind)
-        for paw in range(len(paws)):
-            mask = labeled_mx == paw
-            # TODO: paw left - rigth and front - back distinction
+        warnings.warn('Dog has too few or many paws!')
 
     return len(paws), paws
+
+
+def get_paw_area(matrix, labeled_mx, paw_cluster):
+    assert matrix.shape == labeled_mx.shape
+    mask = labeled_mx == paw_cluster
+    return np.array(matrix[mask])
 
 
 def find_nzero_clusters(matrix, neighbor_distance):  # values in matrix are used to find neighbouring (also diag.) elems
@@ -71,7 +121,7 @@ def find_nzero_clusters(matrix, neighbor_distance):  # values in matrix are used
             indices.append(tmp_ind)
     print('\ndetected paw area(s):\n', labeled_matrix)
     # print('ind:', indices)
-    return numpy.delete(uniques, 0), indices, labeled_matrix
+    return np.delete(uniques, 0), indices, labeled_matrix
 
 
 adj = np.ones((3, 3))  # structure element defining connection rules between features
@@ -98,17 +148,18 @@ matrix = np.array([[0.0, 0.0, 1.7, 1.7, 1.7, 6.2, 1.7, 0.0, 0.0, 0.0, 0.0, 0.0, 
                    [0.0, 0.0, 1.7, 2.3, 1.7, 0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
+                   [5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
+                   [5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 6.2, 2.8, 0.6, 0.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.5, 21.6, 9.7, 9.7, 4.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 4.0, 11.9, 8.5, 15.3, 6.],
-                   [0.0, 0.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.6, 5.1, 4.5, 2.3, 2.8, 6.2, 2.],
-                   [0.0, 0.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.6, 5.7, 4.0, 0.0, 0.0, 3.4, 5.],
+                   [0.0, 0.0, 0.0, 5.0, 5.0, 0.0, 0.0, 0.6, 5.1, 4.5, 2.3, 2.8, 6.2, 2.],
+                   [0.0, 0.0, 0.0, 5.0, 5.0, 0.0, 0.0, 0.6, 5.7, 4.0, 0.0, 0.0, 3.4, 5.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 0.0, 0.0, 0.6, 5.1, 7.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 4.0, 1.1, 2.3, 2.],
                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 2.8, 0.6, 0.0, 0.0]])
 
 if __name__ == '__main__':
     paw_recognition(matrix)
+    pprint(vars(FL))
     pass
