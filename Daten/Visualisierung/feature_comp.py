@@ -25,6 +25,15 @@ class Paw(object):
         self.ground = ground
         self.ax_ind = ax_ind
 
+    def lift(self):
+        self.ground = False
+        self.area = [[]]
+
+    def touch(self, matrix, labeled_mx, start_index):
+        self.ground = True
+        self.start_index = start_index
+        self.area = get_paw_area(matrix, labeled_mx, labeled_mx[start_index])
+
 
 FL = Paw((-1, -1), True, False, [[]], (0, 0))
 FR = Paw((-1, -1), True, True, [[]], (0, 1))
@@ -39,56 +48,76 @@ def paw_recognition(matrix):
     :param matrix:
     :return: number of paws and their left uppermost index
     """
-    paws, start_ind, labeled_mx = find_nzero_clusters(matrix, 3)
+    paws, start_ind, labeled_mx = find_nzero_clusters(matrix, 5)
     if len(paws) != len(start_ind): warnings.warn('no. of paws does not match no. of paw starting points')
 
     paw_count = len(paws)
-    print('paws:', paws)
+    print('%i paw(s)' % paw_count)
     print(start_ind)
-    if paw_count == 0:
-        print('%i paws' % paw_count)
+    if paw_count == 0:  # Trab == diagonal paws
         pass
     elif paw_count == 1:
-        print('%i paw' % paw_count)
         pass
     elif paw_count == 2:
         front = min(start_ind)  # first distinction b/w front <=> back paw (smaller row means front)
         back = max(start_ind)
         if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
-            FL.start_index = front
-            FL.ground = True
-            FL.area = [get_paw_area(matrix, labeled_mx, labeled_mx[FL.start_index])]
-            FR.ground = False
+            FL.touch(matrix, labeled_mx, front)
+            FR.lift()
 
-            BR.start_index = back
-            BR.ground = True
-            BR.area = [get_paw_area(matrix, labeled_mx, labeled_mx[BR.start_index])]
-            BL.ground = False
+            BR.touch(matrix, labeled_mx, back)
+            BL.lift()
         else:
-            FR.start_index = front
-            FR.ground = True
-            FR.area = [get_paw_area(matrix, labeled_mx, labeled_mx[FR.start_index])]
-            FL.ground = False
+            FR.touch(matrix, labeled_mx, front)
+            FL.lift()
 
-            BL.start_index = back
-            BL.ground = True
-            BL.area = [get_paw_area(matrix, labeled_mx, labeled_mx[BL.start_index])]
-            BR.ground = False
+            BL.touch(matrix, labeled_mx, back)
+            BR.lift()
     elif paw_count == 3:
-        print('%i paws' % paw_count)
-        pass
+        front = min(start_ind)
+        mid = start_ind[1]
+        back = max(start_ind)
+        if front[1] < mid[1]:
+            FL.touch(matrix, labeled_mx, front)
+            BL.touch(matrix, labeled_mx, back)
+
+            # TODO FR.lift()? or BR?
+        else:
+            FR.touch(matrix, labeled_mx, front)
+            BR.touch(matrix, labeled_mx, back)
+
+            # which ones are lifted?
     elif paw_count == 4:
-        print('dog stays still (4 paws on ground)')
+        front = min(start_ind)
+        back = max(start_ind)
+        if front[1] < back[1]:
+            # TODO: new function for updating matrix and labeled_mx for each touch()-call
+            FL.touch(matrix, labeled_mx, front)
+            BR.touch(matrix, labeled_mx, back)
+            FR.touch(matrix, labeled_mx, start_ind[1])
+            BL.touch(matrix, labeled_mx, start_ind[2])
+        else:
+            FR.touch(matrix, labeled_mx, front)
+            BL.touch(matrix, labeled_mx, back)
+            FL.touch(matrix, labeled_mx, start_ind[1])
+            BR.touch(matrix, labeled_mx, start_ind[2])
     else:
         warnings.warn('Dog has too few or many paws!')
 
-    return len(paws), paws
+    return len(paws)
 
 
 def get_paw_area(matrix, labeled_mx, paw_cluster):
     assert matrix.shape == labeled_mx.shape
     mask = labeled_mx == paw_cluster
-    return np.array(matrix[mask])
+    ret_mx = matrix.copy()
+    ret_mx[~mask] = 0
+    non_zero_rows = np.any(ret_mx != 0, axis=1)
+    start_index = np.argmax(non_zero_rows)
+    end_index = len(matrix) - np.argmax(non_zero_rows[::-1])  # Reverse-Index
+    non_zero_cols = np.any(ret_mx != 0, axis=0)
+    non_zero_cols_indices = np.where(non_zero_cols)[0]
+    return ret_mx[start_index:end_index, non_zero_cols_indices]
 
 
 def find_nzero_clusters(matrix, neighbor_distance):  # values in matrix are used to find neighbouring (also diag.) elems
@@ -119,8 +148,7 @@ def find_nzero_clusters(matrix, neighbor_distance):  # values in matrix are used
         tmp_ind = np.unravel_index(i, labeled_matrix.shape)  # left uppermost index of area
         if labeled_matrix[tmp_ind] != 0:  # not include 0-cluster since it is not a paw area
             indices.append(tmp_ind)
-    print('\ndetected paw area(s):\n', labeled_matrix)
-    # print('ind:', indices)
+    # print('\ndetected paw area(s):\n', labeled_matrix)
     return np.delete(uniques, 0), indices, labeled_matrix
 
 
