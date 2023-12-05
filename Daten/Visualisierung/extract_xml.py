@@ -1,6 +1,8 @@
+import os.path
 import sys
 import xml.etree.ElementTree as et
 
+import settings
 import matplotlib.pyplot as plt
 
 from feature_comp import *
@@ -29,8 +31,29 @@ def get_movement(filepath, id):
             return movement
 
 
+def set_movement_type(filepath):
+    print('file:', os.path.basename(filepath))
+    if 'Schritt' in filepath:
+        settings.GAIT_TYPE = 0
+    elif 'Trab' in filepath:
+        settings.GAIT_TYPE = 1
+    else:
+        warnings.warn('XML file misses gait type declaration')
+
+
+def set_direction(movement):
+    if movement.find('.//zb:type', NS).text == 'forward':
+        settings.DIRECTION = 1
+        print('direction: forward')
+    else:
+        settings.DIRECTION = 0
+        print('direction: backward')
+
+
 def extract_matrices(filepath, id):
+    set_movement_type(filepath)
     root = get_movement(filepath, id)
+    set_direction(root)
 
     # extract matrix data from xml
     quant_elements = root.findall(".//zb:data/zb:quant", NS)
@@ -82,25 +105,27 @@ def visualize(filepath, id):
 
     mx_ctr = 0
     for mx in matrix:
-        if mx and mx_ctr % 10 == 0:
+        if mx and mx_ctr % 5 == 0:
             mx_np = np.array(mx)
             paw_recognition(mx_np)
             vis_paws(fig_paws, axes_paws)
 
             # local
             ax_local.set_axis_off()
-            # ax_local.imshow(
-            #     np.flipud(np.fliplr(mx_np)))  # rotate 180° to fit vertical direction of matrix to global view
-            ax_local.imshow(mx_np)
+            if settings.DIRECTION:
+                ax_local.imshow(mx_np)
+            else:
+                ax_local.imshow(
+                    np.flipud(np.fliplr(mx_np)))  # rotate 180° to fit vertical direction of matrix to global view
 
             # global
             ax_global.set_axis_off()
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
-            ax_global.matshow(global_mx)
+            ax_global.imshow(global_mx)
 
             # total (drains performance heavily)
             # total_mx += global_mx
-            # ax_total.matshow(total_mx)
+            # ax_total.imshow(total_mx)
 
             plt.pause(0.00001)
         mx_ctr += 1
@@ -116,8 +141,9 @@ def vis_paws(figure, axes):
 
     for paw_name, paw_obj in vars(TheDog).items():
         try:
-            axes[paw_obj.ax_ind].matshow(paw_obj.area)
-            axes[paw_obj.ax_ind].set_title(paw_name)
+            if paw_obj.sure:
+                axes[paw_obj.ax_ind].matshow(paw_obj.area)
+                axes[paw_obj.ax_ind].set_title(paw_name)
         except TypeError:
             print(traceback.format_exc())
             print('err in:', paw_obj.area)
@@ -143,5 +169,5 @@ def create_global_mx(local_mx, offset):
 
 
 if __name__ == '__main__':
-    filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0307068 Trab.xml'
+    filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0398726 Schritt.xml'
     visualize(filep, 'gait_3')
