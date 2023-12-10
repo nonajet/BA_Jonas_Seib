@@ -103,11 +103,14 @@ def visualize(filepath, id):
     fig_paws, axes_paws = plt.subplots(2, 2)
     plt.figure(fig_paws)
 
-    mx_ctr = 0
-    for mx in matrix:
-        if mx and mx_ctr % 5 == 0:
+    mx_ctr = 183
+    for mx in matrix[182:]:
+        print('mx_ctr:', mx_ctr)
+        if mx_ctr == 183 or mx_ctr == 219:
+            print('##3 paws##')
+        if mx:  # and mx_ctr % 5 == 0:
             mx_np = np.array(mx)
-            paw_recognition(mx_np)
+            paw_recognition(mx_np, offset[mx_ctr])
             vis_paws(fig_paws, axes_paws)
 
             # local
@@ -139,11 +142,12 @@ def vis_paws(figure, axes):
     plt.ion()
     plt.figure(figure)
 
+    # pprint(vars(TheDog).items())
     for paw_name, paw_obj in vars(TheDog).items():
         try:
-            if paw_obj.sure:
-                axes[paw_obj.ax_ind].matshow(paw_obj.area)
-                axes[paw_obj.ax_ind].set_title(paw_name)
+            # if paw_obj.sure:
+            axes[paw_obj.ax_ind].matshow(paw_obj.area)
+            axes[paw_obj.ax_ind].set_title(paw_name)
         except TypeError:
             print(traceback.format_exc())
             print('err in:', paw_obj.area)
@@ -169,5 +173,5 @@ def create_global_mx(local_mx, offset):
 
 
 if __name__ == '__main__':
-    filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0398726 Schritt.xml'
+    filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0398726 Trab.xml'
     visualize(filep, 'gait_3')

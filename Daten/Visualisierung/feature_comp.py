@@ -3,50 +3,63 @@ import warnings
 from pprint import pprint
 
 import numpy as np
-# from extract_xml import *
 import settings
 from scipy.ndimage import label
 
 
 class Dog(object):
     def __init__(self, front_left, front_right, back_left, back_right):
-        self.fl = front_left
-        self.fr = front_right
-        self.bl = back_left
-        self.br = back_right
+        self.paws = []
+        self.paws.append(front_left)
+        self.paws.append(front_right)
+        self.paws.append(back_left)
+        self.paws.append(back_right)
+
+        self.local_mx = [[]]
+        self.offset = []
+        self.labeled_mx = [[]]
 
 
 class Paw(object):
     def __init__(self, start_index, area, ax_ind, name, ground=False):
         self.start_index = start_index
+        self.global_pos = (-1, -1)
         self.area = area
         self.ground = ground
         self.ax_ind = ax_ind
         self.name = name
         self.sure = False  # confidence in correct paw recognition
-        self.lastContact = -1  # time steps since last time paw touched ground
+        # TODO maybe lastContact = 1 better
+        self.lastContact = 0  # time steps since last time paw touched ground
 
     def lift(self):
         self.ground = False
         self.area = [[]]
-        self.start_index = [-1, -1]  # changed start index from tuple to list/array
+        self.start_index = (-1, -1)
+        self.global_pos = (-1, -1)
         self.lastContact += 1
 
     def touch(self, matrix, labeled_mx, start_index):
         self.ground = True
         self.start_index = start_index
         self.area = get_paw_area(matrix, labeled_mx, labeled_mx[start_index])
+        self.global_pos = self._get_global_pos()
         self.lastContact = 0
 
+    def _get_global_pos(self):
+        print(self.start_index + TheDog.offset)
+        return self.start_index + TheDog.offset
 
-FL = Paw([-1, -1], [[]], (0, 0), 'fl')
-FR = Paw([-1, -1], [[]], (0, 1), 'fr')
-BL = Paw([-1, -1], [[]], (1, 0), 'bl')
-BR = Paw([-1, -1], [[]], (1, 1), 'br')
+
+FL = Paw((-1, -1), [[]], (0, 0), 'fl')
+FR = Paw((-1, -1), [[]], (0, 1), 'fr')
+BL = Paw((-1, -1), [[]], (1, 0), 'bl')
+BR = Paw((-1, -1), [[]], (1, 1), 'br')
 TheDog = Dog(FL, FR, BL, BR)
 
 
-def paw_recognition(matrix):
+def paw_recognition(matrix, local_mx_offset):
+    print('\n##########new#########\n')
     """
     detects number of paws on the mat. Areas with less than [_] cells between each other are considered one paw.
     :param matrix:
@@ -55,12 +68,14 @@ def paw_recognition(matrix):
     paws, start_ind, labeled_mx = find_nzero_clusters(matrix, 5)
     if len(paws) != len(start_ind):
         warnings.warn('no. of paws does not match no. of paw starting points:\n %i paw(s) <->' % len(paws))
+        print(paws)
         print(start_ind)
 
     paw_count = len(paws)
-    # print('%i paw(s)' % paw_count)
-    print(start_ind)
+    # print('starts:', start_ind)
+    # print('mx:', matrix)
     if paw_count == 0:
+        # settings.three_paws = False  # should only occur at beginning of data set
         FL.lift()
         FL.sure = False
         FR.lift()
@@ -69,13 +84,17 @@ def paw_recognition(matrix):
         BL.sure = False
         BR.lift()
         BR.sure = False
+    elif paw_count != 3 and settings.GAIT_TYPE == 0 and not settings.three_paws:
+        return paw_count
     elif paw_count == 1:
-        paw_on_ground = find_closest_paw(matrix)
+        # TODO: def 'find_paw_by_start_ind' and remove for-loop
+        paw_on_ground = find_closest_paw(matrix, labeled_mx)
         if not paw_on_ground:
             return paw_count
         assert paw_on_ground
         paw_on_ground.touch(matrix, labeled_mx, start_ind)
-        for paw_name, paw_obj in vars(TheDog).items():
+        # TODO: create def for 'lift_others(param=newly_planted_paws)'
+        for paw_name, paw_obj in vars(TheDog).items():  # lift other paws that are not on mat (anymore)
             try:
                 if paw_obj is not paw_on_ground:
                     paw_obj.lift()
@@ -86,6 +105,14 @@ def paw_recognition(matrix):
         front = min(start_ind)  # first distinction b/w front <=> back paw (smaller row means front)
         back = max(start_ind)
         if settings.GAIT_TYPE:  # Trab
+            for paw_name, paw_obj in vars(TheDog).items():  # lift other paws that are not on mat (anymore)
+                try:
+                    if paw_obj is is_nonzero_neighborhood(labeled_mx, paw_obj.start_index, 4):
+                        paw_obj.touch(matrix, labeled_mx,
+                                      front)  # front is placeholder; return from is_nonzero... needed
+                except TypeError:
+                    print(traceback.format_exc())
+
             if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
                 FL.touch(matrix, labeled_mx, front)
                 FL.sure = True
@@ -101,7 +128,7 @@ def paw_recognition(matrix):
                 FL.lift()
                 BR.lift()
         else:  # Schritt
-            # should not work correctly yet
+            # TODO: should not work correctly yet
             if FR.ground or BR.ground:  # accurate dist. possible (since paw still on ground from timestep before)
                 FR.touch(matrix, labeled_mx, front)
                 FR.sure = True
@@ -137,6 +164,7 @@ def paw_recognition(matrix):
         front = min(start_ind)
         mid = start_ind[1]
         back = max(start_ind)
+
         if settings.GAIT_TYPE:  # Trab
             if front[1] < mid[1]:
                 FL.touch(matrix, labeled_mx, front)
@@ -144,31 +172,74 @@ def paw_recognition(matrix):
                 BR.touch(matrix, labeled_mx, back)
                 BR.sure = True
 
-                # TODO FR.lift()? or BL?
+                if not settings.three_paws:  # first time 3 paws on mat the 2nd front paw is guessed
+                    FR.touch(matrix, labeled_mx, mid)
+                    FR.sure = False
+                    BL.lift()
+                    BL.sure = False
+                else:
+                    try:
+                        next_paw = get_max_airborne_paw()
+                        if next_paw:
+                            next_paw.touch(matrix, labeled_mx, mid)
+                        get_corresponding_paw(next_paw, 1).lift()
+                    except TypeError:
+                        print(traceback.format_exc())
             else:
                 FR.touch(matrix, labeled_mx, front)
                 FR.sure = True
                 BL.touch(matrix, labeled_mx, back)
                 BL.sure = True
 
-                # TODO FL.lift()? or BR?
+                if not settings.three_paws:
+                    FL.touch(matrix, labeled_mx, mid)
+                    FL.sure = False
+                    BR.lift()
+                    BR.sure = False
+                else:
+                    try:
+                        next_paw = get_max_airborne_paw()
+                        if next_paw:
+                            next_paw.touch(matrix, labeled_mx, mid)
+                        get_corresponding_paw(next_paw, 0).lift()
+                    except TypeError:
+                        print(traceback.format_exc())
         else:  # Schritt
-            if front[1] < mid[1]:
+            if front[1] < mid[1]:  # left side
                 FL.touch(matrix, labeled_mx, front)
                 FL.sure = True
                 BL.touch(matrix, labeled_mx, back)
                 BL.sure = True
-                # TODO FR.lift()? or BR?
-                FR.touch(matrix, labeled_mx, mid)  # guess for right front paw
-                FR.sure = False
-            else:
+                # TODO FR.lift()? or BR? is front paw really first while Schritt gait?
+
+                if not settings.three_paws:  # first time 3 paws on mat the 2nd front paw is guessed
+                    FR.touch(matrix, labeled_mx, mid)
+                    FR.sure = False
+                    BR.lift()
+                    BR.sure = False
+                else:
+                    next_paw = get_max_airborne_paw()
+                    next_paw.touch(matrix, labeled_mx, mid)
+                    get_corresponding_paw(next_paw, 0).lift()
+
+            else:  # right side
                 FR.touch(matrix, labeled_mx, front)
                 FR.sure = True
                 BR.touch(matrix, labeled_mx, back)
                 BR.sure = True
-                # TODO FL.lift()? or BL?
-                FL.touch(matrix, labeled_mx, mid)
-                FL.sure = False
+
+                if not settings.three_paws:
+                    FL.touch(matrix, labeled_mx, mid)
+                    FL.sure = False
+                    BL.lift()
+                    BL.sure = False
+                else:
+                    next_paw = get_max_airborne_paw()
+                    next_paw.touch(matrix, labeled_mx, mid)
+                    get_corresponding_paw(next_paw, 0).lift()
+
+        if not settings.three_paws:
+            settings.three_paws = True  # only relevant for first time with 3 paws on ground
     elif paw_count == 4:
         front = min(start_ind)
         back = max(start_ind)
@@ -189,8 +260,8 @@ def paw_recognition(matrix):
     return paw_count
 
 
-def find_closest_paw(matrix):
-    active_paws = get_active_paws()
+def find_closest_paw(matrix, labeled_mx):
+    active_paws = get_active_paws()  # only consider paws on ground as active
     if not active_paws:
         return None
     assert active_paws
@@ -198,24 +269,34 @@ def find_closest_paw(matrix):
     for paw in active_paws:
         start_indices.append(paw.start_index)
 
-    non_zero_indices = np.transpose(np.nonzero(matrix))  # Indizes der Nicht-Null-Elemente
-    min_distance = np.inf
-    closest_index = None
+    non_zero_index = np.transpose(np.nonzero(matrix))[0]  # Index des 1. Nicht-Null-Elements
+    print('nz_ind:', non_zero_index)
+    # min_distance = np.inf
+    # closest_index = None
+    #
+    # for start_index in start_indices:
+    #     distance = np.linalg.norm(np.array(start_index) - np.array(non_zero_index))
+    #     print('dist: ', distance)
+    #     if distance < min_distance:
+    #         min_distance = distance
+    #         closest_index = start_index
+    # for paw in active_paws:
+    #     print('closest:', type(closest_index), '\npaw:', type(paw.start_index))
+    #     print('closest:', closest_index, '\npaw:', paw.start_index)
+    #     if closest_index[0] == paw.start_index[0] and closest_index[1] == paw.start_index[1]:
+    #         return paw
 
-    for start_index in start_indices:
-        for non_zero_index in non_zero_indices:
-            distance = np.linalg.norm(np.array(start_index) - np.array(non_zero_index))
-            if distance < min_distance:
-                min_distance = distance
-                closest_index = non_zero_index
+    for paw_name, paw_obj in vars(TheDog).items():  # TODO: testing
+        try:
+            if paw_obj.ground and is_nonzero_neighborhood(labeled_mx, paw_obj.start_index, 4):
+                # paw_obj.touch(matrix, labeled_mx, non_zero_index)
+                return paw_obj
+        except TypeError:
+            print(traceback.format_exc())
+            print('no closest paw for touching paw found')
+            return None
 
-    for paw in active_paws:
-        print('closest:', type(closest_index), '\npaw:', type(paw.start_index))
-        print('closest:', closest_index, '\npaw:', paw.start_index)
-        if np.array_equal(closest_index, paw.start_index):
-            return paw
-
-    print('no closest paw for 1 touching paw found')
+    print('no closest paw for touching paw found')
     return None
 
 
@@ -232,7 +313,8 @@ def get_active_paws():
 
 def get_paw_area(matrix, labeled_mx, paw_cluster):  # return paw area without empty rows or col
     assert matrix.shape == labeled_mx.shape
-    assert paw_cluster
+    print('cluster:', paw_cluster)
+    assert paw_cluster.all()
     mask = labeled_mx == paw_cluster
     ret_mx = matrix.copy()
     ret_mx[~mask] = 0
@@ -275,6 +357,25 @@ def find_nzero_clusters(matrix, neighbor_distance):  # values in matrix are used
             indices.append(tmp_ind)
     # print('\ndetected paw area(s):\n', labeled_matrix)
     return np.delete(uniques, 0), indices, labeled_matrix
+
+
+def is_nonzero_neighborhood(labeled_matrix, startindex, neighborhood):
+    nbh = neighborhood  # determines radius in which paw area is searched
+    r, c = startindex
+    try:
+        # only limit lower bounds since slicing handles upper bounds of matrix
+        lower_r = r - nbh if r - nbh >= 0 else 0
+        lower_c = c - nbh if c - nbh >= 0 else 0
+        subset = labeled_matrix[lower_r:r + nbh + 1, lower_c:c + nbh + 1]
+        for index, nb in np.ndenumerate(subset):
+            if nb != 0:
+                print('index:', index)
+                print('labeled:', labeled_matrix)
+                return True
+        return False
+    except IndexError:
+        warnings.warn('out of bounds at zero-neighborhood check\n')
+        print(traceback.format_exc())
 
 
 def get_max_airborne_paw():  # returns paw obj. with highest time since last ground contact
