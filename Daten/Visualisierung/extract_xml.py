@@ -2,7 +2,7 @@ import os.path
 import sys
 import xml.etree.ElementTree as et
 
-import settings
+import gc
 import matplotlib.pyplot as plt
 
 from feature_comp import *
@@ -86,6 +86,7 @@ def extract_matrices(filepath, id):
 
 def visualize(filepath, id):
     np.set_printoptions(threshold=sys.maxsize)
+
     matrix, offset = extract_matrices(filepath, id)
     fig, ax = plt.subplots(1, 3)  # (ax_local, ax_global, ax_total)
     plt.ion()
@@ -103,34 +104,33 @@ def visualize(filepath, id):
     fig_paws, axes_paws = plt.subplots(2, 2)
     plt.figure(fig_paws)
 
-    mx_ctr = 183
-    for mx in matrix[182:]:
-        print('mx_ctr:', mx_ctr)
-        if mx_ctr == 183 or mx_ctr == 219:
-            print('##3 paws##')
-        if mx:  # and mx_ctr % 5 == 0:
+    mx_ctr = 99  # 94
+    for mx in matrix[99:]:
+        if mx:
+            print('\n######################')
+            print('mx_ctr:', mx_ctr)
             mx_np = np.array(mx)
-            paw_recognition(mx_np, offset[mx_ctr])
+            global_mx = create_global_mx(mx_np, offset[mx_ctr])
+            paw_recognition(mx_np, offset[mx_ctr], global_mx)
             vis_paws(fig_paws, axes_paws)
 
+            # if mx_ctr % 5 == 0:
             # local
+            ax_local.imshow(mx_np)
             ax_local.set_axis_off()
-            if settings.DIRECTION:
-                ax_local.imshow(mx_np)
-            else:
-                ax_local.imshow(
-                    np.flipud(np.fliplr(mx_np)))  # rotate 180° to fit vertical direction of matrix to global view
+            # ax_local.imshow(np.flipud(np.fliplr(mx_np)))  # rotate 180° to fit vertical
+            # direction of matrix to global view
 
             # global
-            ax_global.set_axis_off()
-            global_mx = create_global_mx(mx_np, offset[mx_ctr])
             ax_global.imshow(global_mx)
+            ax_global.set_axis_off()
 
             # total (drains performance heavily)
             # total_mx += global_mx
             # ax_total.imshow(total_mx)
 
             plt.pause(0.00001)
+            gc.collect()
         mx_ctr += 1
 
     print(
@@ -142,17 +142,17 @@ def vis_paws(figure, axes):
     plt.ion()
     plt.figure(figure)
 
-    # pprint(vars(TheDog).items())
-    for paw_name, paw_obj in vars(TheDog).items():
+    for paw_obj in TheDog.paws:
         try:
             # if paw_obj.sure:
             axes[paw_obj.ax_ind].matshow(paw_obj.area)
-            axes[paw_obj.ax_ind].set_title(paw_name)
+            axes[paw_obj.ax_ind].set_title(paw_obj.name)
+            axes[paw_obj.ax_ind].set_axis_off()
         except TypeError:
             print(traceback.format_exc())
             print('err in:', paw_obj.area)
 
-    plt.axis('off')
+    # plt.axis('off')
     plt.pause(0.0001)
 
 
@@ -167,11 +167,11 @@ def create_global_mx(local_mx, offset):
 
     try:
         global_mx[-1 - x_off - rows:-1 - x_off, y_off:y_off + cols] = local_mx
-    except ValueError as e:
-        print(e)
+    except ValueError:
+        print(traceback.format_exc())
     return global_mx
 
 
 if __name__ == '__main__':
     filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0398726 Trab.xml'
-    visualize(filep, 'gait_3')
+    visualize(filep, 'gait_2')
