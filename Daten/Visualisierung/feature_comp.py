@@ -20,6 +20,10 @@ class Dog(object):
         self.labeled_mx = np.array([[]])
         self.prev_global_mx = np.array([[]])
         self.global_mx = np.array([[]])
+        self.prev_front_most_ind = (-1, -1)
+        self.front_most_ind = (-1, -1)
+
+        self.newly_planted_paws = set()
 
 
 class Paw(object):
@@ -33,6 +37,7 @@ class Paw(object):
         self.sure = False  # confidence in correct paw recognition
         # TODO maybe lastContact = 1 better
         self.lastContact = 0  # time steps since last time paw touched ground
+        self.set_since = 0
 
     def lift(self):
         self.ground = False
@@ -40,6 +45,7 @@ class Paw(object):
         self.start_index = (-1, -1)
         self.global_pos = (-1, -1)
         self.lastContact += 1
+        self.set_since = 0
 
     def touch(self, start_index):
         self.ground = True
@@ -47,9 +53,10 @@ class Paw(object):
         self.area = get_paw_area(TheDog.labeled_mx[start_index])
         self.global_pos = calc_global_pos(start_index)
         self.lastContact = 0
+        self.set_since += 1
+        TheDog.newly_planted_paws.add(self)
 
 
-# TODO: increase performance by dog init in exctract_xml.py?
 FL = Paw((-1, -1), [[]], (0, 0), 'fl')
 FR = Paw((-1, -1), [[]], (0, 1), 'fr')
 BL = Paw((-1, -1), [[]], (1, 0), 'bl')
@@ -58,18 +65,19 @@ TheDog = Dog(FL, FR, BL, BR)
 
 
 def compare_glob_pos(paw_obj, start_ind):  # param: one paw, all new paw areas
+    # 'traceback' of prev. used areas on the mat to the corresponding paw that has been in that area
     nbh = settings.NEIGHBOR_DIST
     assert start_ind
     for start in start_ind:
         dist = np.subtract(paw_obj.global_pos, calc_global_pos(start))
-        print('glob_pos:', calc_global_pos(start), 'for', start)
-        if all(val <= nbh for val in dist):
+        # print('glob_pos:', calc_global_pos(start), 'for', start)
+        if all(abs(val) <= nbh for val in dist):
             print('dist:', dist)
             return start
     return -1, -1
 
 
-def calc_global_pos(start_ind):  # TODO: testing
+def calc_global_pos(start_ind):
     y_off, x_off = TheDog.offset
     local_r, local_c = TheDog.local_mx.shape
     x = 481 - 1 - x_off - local_r + start_ind[0]
@@ -96,68 +104,50 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
     TheDog.labeled_mx = labeled_mx
     TheDog.prev_global_mx = TheDog.global_mx
     TheDog.global_mx = global_mx
+    TheDog.prev_front_most_ind = TheDog.front_most_ind
+    TheDog.front_most_ind = min(start_ind)
+    TheDog.newly_planted_paws = set()
     if len(paws) != len(start_ind):
         warnings.warn('no. of paws %i does not match no. of paw starting points:' % len(paws))
         print('paws:', paws, '\nstart_ind:', start_ind)
 
     paw_count = len(paws)
-    if paw_count == 0:
-        # settings.three_paws = False  # should only occur at beginning of data set
-        print('lift all paws since 0 on mat')
-        FL.lift()
-        FR.lift()
-        BL.lift()
-        BR.lift()
-    elif paw_count != 3 and settings.GAIT_TYPE == 0 and not settings.three_paws:
+    if paw_count == 1 and settings.GAIT_TYPE == 0 and not settings.three_paws:
         return paw_count
-    elif paw_count == 1:
-        paw_on_ground = None
-        for paw_obj in get_active_paws():
-            try:
-                start = compare_glob_pos(paw_obj, start_ind)
-                if start in start_ind:
-                    paw_obj.touch(start)
-                    paw_on_ground = paw_obj
-            except TypeError as e:
-                raise Exception('1 paw') from e
+    elif paw_count == 1 and settings.GAIT_TYPE == 1 and not settings.two_paws:  # for Trab wait for at least 2 paws to start
+        return paw_count
 
+    # default for 1 - 3 paws ('backtracing')
+    paw_on_ground = None  # only relevant for 1 paw case
+    paws_planted = 0
+    for paw_obj in get_active_paws():
+        try:
+            start = compare_glob_pos(paw_obj, start_ind)
+            if start in start_ind:
+                paw_obj.touch(start)
+                paws_planted += 1
+                paw_on_ground = paw_obj
+        except TypeError as e:
+            raise Exception('at %i paw(s)' % paw_count) from e
+
+    if paw_count == 1:
         if not paw_on_ground:
-            lift_other_paws([])
             print('no paw before at', start_ind[0])
-            return paw_count
+            paw_on_ground = get_max_airborne_paw(True)
+            assert paw_on_ground
+            paw_on_ground.touch(start_ind[0])
 
-        lift_other_paws(paw_on_ground)
-
-    elif paw_count == 2:
+        lift_other_paws([paw_on_ground])
+    elif paw_count == 2 and paws_planted < paw_count:
         front = min(start_ind)  # first distinction b/w front <=> back paw (smaller row means front)
         back = max(start_ind)
-        paws_planted = 0
         if settings.GAIT_TYPE:  # Trab
-            # TODO def 'traceback_paws', untraceable areas are newly planted then
-            for paw_obj in get_active_paws():
-                try:
-                    start = compare_glob_pos(paw_obj, start_ind)
-                    if start in start_ind:
-                        paw_obj.touch(start)
-                        paws_planted += 1
-                except TypeError as e:
-                    raise Exception('2 paws') from e
-
-            if paws_planted < paw_count:
-                if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
-                    FL.touch(front)
-                    FL.sure = True
-                    BR.touch(back)
-                    BR.sure = True
-                    FR.lift()
-                    BL.lift()
-                else:
-                    FR.touch(front)
-                    FR.sure = True
-                    BL.touch(back)
-                    BL.sure = True
-                    FL.lift()
-                    BR.lift()
+            if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
+                FL.touch(front)  # TODO: test for already planted paws and set/lift missing paws
+                BR.touch(back)
+            else:
+                FR.touch(front)
+                BL.touch(back)
         else:  # Schritt
             # TODO: should not work correctly yet
             if FR.ground or BR.ground:  # accurate dist. possible (since paw still on ground from timestep before)
@@ -191,83 +181,55 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
                 else:
                     FL.lift()
                     BL.lift()
-    elif paw_count == 3:
+
+        if not settings.two_paws:
+            settings.two_paws = True  # only relevant for first time with 2 paws on ground (Trab)
+    elif paw_count == 3 and paws_planted < paw_count:
         front = min(start_ind)
         mid = start_ind[1]
         back = max(start_ind)
 
         if settings.GAIT_TYPE:  # Trab
-            if front[1] < mid[1]:
-                FL.touch(front)
-                FL.sure = True
-                BR.touch(back)
-                BR.sure = True
+            active_paw_start_indices = [act_paw.start_index for act_paw in get_active_paws()]
+            for start in start_ind:
+                if start not in active_paw_start_indices:
+                    if start == front:
+                        if front[1] < mid[1]:
+                            FL.touch(start)
+                        else:
+                            FR.touch(start)
+                        break
+                    else:
+                        try:
+                            next_paw = get_max_airborne_paw()
+                            if next_paw:
+                                next_paw.touch(mid)
+                        except TypeError as e:
+                            raise Exception('at 3 paws') from e
 
-                if not settings.three_paws:  # first time 3 paws on mat the 2nd front paw is guessed
-                    FR.touch(mid)
-                    FR.sure = False
-                    BL.lift()
-                    BL.sure = False
-                else:
-                    try:
-                        next_paw = get_max_airborne_paw()
-                        if next_paw:
-                            next_paw.touch(mid)
-                        get_corresponding_paw(next_paw, 1).lift()
-                    except TypeError:
-                        print(traceback.format_exc())
-            else:
-                FR.touch(front)
-                FR.sure = True
-                BL.touch(back)
-                BL.sure = True
-
-                if not settings.three_paws:
-                    FL.touch(mid)
-                    FL.sure = False
-                    BR.lift()
-                    BR.sure = False
-                else:
-                    try:
-                        next_paw = get_max_airborne_paw()
-                        if next_paw:
-                            next_paw.touch(mid)
-                        get_corresponding_paw(next_paw, 0).lift()
-                    except TypeError as e:
-                        raise Exception('3 paws') from e
         else:  # Schritt
             if front[1] < mid[1]:  # left side
                 FL.touch(front)
-                FL.sure = True
                 BL.touch(back)
-                BL.sure = True
                 # TODO FR.lift()? or BR? is front paw really first while Schritt gait?
 
                 if not settings.three_paws:  # first time 3 paws on mat the 2nd front paw is guessed
                     FR.touch(mid)
-                    FR.sure = False
-                    BR.lift()
-                    BR.sure = False
                 else:
                     next_paw = get_max_airborne_paw()
                     next_paw.touch(mid)
-                    get_corresponding_paw(next_paw, 0).lift()
+                    # get_corresponding_paw(next_paw, 0).lift()
 
             else:  # right side
                 FR.touch(front)
-                FR.sure = True
                 BR.touch(back)
-                BR.sure = True
 
                 if not settings.three_paws:
                     FL.touch(mid)
-                    FL.sure = False
-                    BL.lift()
-                    BL.sure = False
                 else:
                     next_paw = get_max_airborne_paw()
                     next_paw.touch(mid)
-                    get_corresponding_paw(next_paw, 0).lift()
+                    # get_corresponding_paw(next_paw, 0).lift()
 
         if not settings.three_paws:
             settings.three_paws = True  # only relevant for first time with 3 paws on ground
@@ -284,36 +246,22 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
             BL.touch(back)
             FL.touch(start_ind[1])
             BR.touch(start_ind[2])
+    elif paw_count > 4:
+        warnings.warn('Dog has too many paws!')
     else:
-        warnings.warn('Dog has too few or many paws!')
+        print('nothing done except backtracing')
 
-    # if not paw_count == 0:
-    #     calc_glob_poss()
-
+    lift_other_paws(TheDog.newly_planted_paws)
     return paw_count
 
 
 def lift_other_paws(newly_planted_paws):
     for paw_obj in TheDog.paws:
         try:
-            if paw_obj is not newly_planted_paws:
+            if paw_obj not in newly_planted_paws:
                 paw_obj.lift()
         except TypeError as e:
-            raise Exception('paw not lifted') from e
-
-
-# def calc_glob_poss():
-#     global_r, global_c = TheDog.global_mx.shape
-#     local_r, local_c = TheDog.local_mx.shape
-#     for paw in TheDog.paws:
-#         for i in range(global_r - local_r + 1):
-#             for j in range(global_c - local_c + 1):
-#                 try:
-#                     if TheDog.global_mx[i:i + local_r][j:j + local_c] == TheDog.local_mx:
-#                         paw.global_pos = tuple([i, j])
-#                 except ValueError as e:
-#                     raise Exception('error in global pos. computing') from e
-#         paw.global_pos = (-1, -1)
+            raise Exception('paw could not be lifted') from e
 
 
 def get_active_paws():
@@ -399,15 +347,18 @@ def is_nonzero_neighborhood(startindex, neighborhood):
         print(traceback.format_exc())
 
 
-def get_max_airborne_paw():  # returns paw obj. with highest time since last ground contact
-    longest_air_paw = FL
+def get_max_airborne_paw(only_front=False):  # returns paw obj. with highest time since last ground contact
+    longest_air_paw = None
+    max_t = -np.inf
     for paw_obj in TheDog.paws:
-        try:
-            if paw_obj.lastContact < longest_air_paw.lastContact:
+        if only_front:
+            if paw_obj.lastContact > max_t and 'f' in paw_obj.name:
                 longest_air_paw = paw_obj
-        except TypeError:
-            print(traceback.format_exc())
-            print('err in:', paw_obj.area)
+                max_t = paw_obj.lastContact
+        else:
+            if paw_obj.lastContact > max_t:
+                longest_air_paw = paw_obj
+                max_t = paw_obj.lastContact
 
     return longest_air_paw
 
@@ -443,38 +394,5 @@ def get_corresponding_paw(paw,
 
 adj = np.ones((3, 3))  # structure element defining connection rules between features
 
-# for testing
-tmparr = np.array([[1, 0, 0, 5, 0, 1.1, 0, 0, 0],
-                   [0, 0, 0, 0, 4., 7.4, 3.4, 0., 0.],
-                   [0, 0, 0, 0, 6.2, 9.7, 4., 0., 0.],
-                   [0, 1.1, 5.7, 6.8, 3.4, 4., 2.3, 1.7, 0.6],
-                   [0, 4.5, 5.7, 1.7, 0., 0., 2.3, 7.4, 2.8],
-                   [0.6, 7.9, 9.1, 1.1, 1.7, 1.1, 2.3, 5.1, 1.7],
-                   [0, 3.4, 4., 2.3, 6.2, 4.5, 0.6, 0., 0.],
-                   [0, 0, 0, 0, 0, 6.2, 0.6, 0., 0.],
-                   [0, 0, 3, 3.4, 0, 1.7, 0., 0., 0.]])
-
-matrix = np.array([[0.0, 0.0, 1.7, 1.7, 1.7, 6.2, 1.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.6, 12.5, 14.8, 9.1, 22.1, 5.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 1.7, 18.2, 17.0, 10.2, 14.8, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 4.0, 7.9, 5.1, 2.8, 3.4, 2.8, 4.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [2.8, 17.6, 8.5, 0.6, 0.0, 0.0, 6.8, 12.5, 2.3, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [3.4, 19.3, 8.5, 3.4, 5.1, 1.7, 5.1, 7.9, 1.1, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 3.4, 2.8, 7.4, 11.4, 4.0, 0.0, 1.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.0, 3.4, 8.5, 9.7, 4.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [0.0, 0.0, 1.7, 2.3, 1.7, 0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 6.2, 2.8, 0.6, 0.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.5, 21.6, 9.7, 9.7, 4.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 4.0, 11.9, 8.5, 15.3, 6.],
-                   [0.0, 0.0, 0.0, 5.0, 5.0, 0.0, 0.0, 0.6, 5.1, 4.5, 2.3, 2.8, 6.2, 2.],
-                   [0.0, 0.0, 0.0, 5.0, 5.0, 0.0, 0.0, 0.6, 5.7, 4.0, 0.0, 0.0, 3.4, 5.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 0.0, 0.0, 0.6, 5.1, 7.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 4.0, 1.1, 2.3, 2.],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 2.8, 0.6, 0.0, 0.0]])
-
 if __name__ == '__main__':
-    lift_other_paws([])
+    pass

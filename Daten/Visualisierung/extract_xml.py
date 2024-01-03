@@ -1,5 +1,6 @@
 import os.path
 import sys
+import time
 import xml.etree.ElementTree as et
 
 import gc
@@ -85,6 +86,7 @@ def extract_matrices(filepath, id):
 
 
 def visualize(filepath, id):
+    t1 = time.time()
     np.set_printoptions(threshold=sys.maxsize)
 
     matrix, offset = extract_matrices(filepath, id)
@@ -104,8 +106,8 @@ def visualize(filepath, id):
     fig_paws, axes_paws = plt.subplots(2, 2)
     plt.figure(fig_paws)
 
-    mx_ctr = 99  # 94
-    for mx in matrix[99:]:
+    mx_ctr = 135  # 160
+    for mx in matrix[135:]:
         if mx:
             print('\n######################')
             print('mx_ctr:', mx_ctr)
@@ -129,10 +131,12 @@ def visualize(filepath, id):
             # total_mx += global_mx
             # ax_total.imshow(total_mx)
 
-            plt.pause(0.00001)
+            plt.pause(0.000001)
             gc.collect()
         mx_ctr += 1
 
+    t2 = time.time()
+    print('\n\nduration:', t2 - t1)
     print(
         '############################################\nmovement (%s) '
         'finished\n############################################' % id)
@@ -153,7 +157,7 @@ def vis_paws(figure, axes):
             print('err in:', paw_obj.area)
 
     # plt.axis('off')
-    plt.pause(0.0001)
+    plt.pause(0.000001)
 
 
 def create_global_mx(local_mx, offset):
@@ -174,4 +178,4 @@ def create_global_mx(local_mx, offset):
 
 if __name__ == '__main__':
     filep = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten\T0398726 Trab.xml'
-    visualize(filep, 'gait_2')
+    visualize(filep, 'gait_1')
