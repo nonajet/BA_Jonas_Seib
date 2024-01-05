@@ -41,9 +41,20 @@ paw_obj2 = Paw('fr')
 paw_obj3 = Paw('bl')
 
 paws = [paw_obj3, paw_obj2, paw_obj1]
-for paw_obj in paws:
-    if paw_obj not in []:
-        print('not inside')
 
-s = set()
-s.add(paw_obj1)
+
+class MeinObjekt:
+    def __init__(self):
+        self.objekt1 = "Hallo"
+        self.objekt2 = 42
+        self.objekt3 = "Welt"
+        self.objekt4 = 100
+
+
+# Ein Beispielobjekt erstellen
+mein_objekt = MeinObjekt()
+
+# Bedingung: Attribute, die Strings enthalten
+ergebnis = [key for key, value in vars(mein_objekt).items() if isinstance(value, str)]
+
+print(ergebnis)
