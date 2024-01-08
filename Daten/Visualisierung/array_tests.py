@@ -1,11 +1,5 @@
 import numpy as np
 
-# Beispielmatrix
-matrix = np.array([[0, 0, 0, 3, 3],
-                   [0, 2, 0, 3, 3],
-                   [0, 0, 0, 1, 0],
-                   [0, 0, 0, 0, 0]])
-
 y = np.array([[0.0, 0.0, 1.7, 1.7, 1.7, 6.2, 1.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
               [0.0, 0.6, 12.5, 14.8, 9.1, 22.1, 5.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
               [0.0, 1.7, 18.2, 17.0, 10.2, 14.8, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -36,25 +30,19 @@ class Paw(object):
         self.name = name
 
 
+def calc_dict_prod(dict_to_calc):
+    tmp = 1
+    for val in dict_to_calc.values():
+        tmp *= val
+    return tmp
+
+
 paw_obj1 = Paw('fl')
 paw_obj2 = Paw('fr')
 paw_obj3 = Paw('bl')
-
 paws = [paw_obj3, paw_obj2, paw_obj1]
+paw_dict = {'fl': -1, 'fr': 2, 'bl': 3, 'br': 10}
 
+mein_dict = {}
 
-class MeinObjekt:
-    def __init__(self):
-        self.objekt1 = "Hallo"
-        self.objekt2 = 42
-        self.objekt3 = "Welt"
-        self.objekt4 = 100
-
-
-# Ein Beispielobjekt erstellen
-mein_objekt = MeinObjekt()
-
-# Bedingung: Attribute, die Strings enthalten
-ergebnis = [key for key, value in vars(mein_objekt).items() if isinstance(value, str)]
-
-print(ergebnis)
+print(mein_dict)

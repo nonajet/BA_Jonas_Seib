@@ -2,13 +2,14 @@ import logging
 
 import mylib
 from Daten.Visualisierung.paw_visualization import visualize
+import feature_creation
 
 
 def set_params(_walk_id, _filename):
     _abs_path = mylib.dirname + '\\' + _filename
     _gait_id = "gait_" + _walk_id
-    mylib.set_dog_id(_abs_path)
-    dog_ident = mylib.get_dog_id()
+    mylib.set_dog_log(_abs_path)
+    dog_ident = mylib.get_dog_log()
 
     logging.basicConfig(filename=dog_ident,
                         filemode='w',  # w:=truncate+write; a:=append
@@ -26,7 +27,8 @@ if __name__ == '__main__':
 
     logger = logging.getLogger()  # logger.create_logger(dog_ident.replace(".xml", ".log"))
     abs_path, gait_id = set_params(walk_id, filename)
-    visualize(abs_path, gait_id, total_view=False)
+    visualize(abs_path, gait_id, mx_start=0, visuals=False, total_view=False)
+    feature_creation.paw_validation()
 
     logger.info('####################################\nmovement (%s) '
                 'finished\n####################################' % gait_id)

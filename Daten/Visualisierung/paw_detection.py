@@ -225,7 +225,6 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
         print('only backtracing')
 
     lift_other_paws(TheDog.newly_planted_paws)
-    # TODO: call paw_processing
     feature_creation.save_paws(TheDog.paws)
 
 
@@ -389,7 +388,7 @@ def get_corresponding_paw(paw,
             return None
 
 
-adj = np.ones((3, 3))  # structure element defining connection rules between features
+adj = np.ones((3, 3))  # structure element defining neighborhood dist. in matrix
 
 if __name__ == '__main__':
     pass

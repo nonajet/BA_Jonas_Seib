@@ -13,12 +13,12 @@ dirname = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohd
 current_dog_log = ''
 
 
-def set_dog_id(abs_filepath):
+def set_dog_log(abs_filepath):
     dog_ident_log = abs_filepath.split('\\')[-1].replace(".xml", ".log")  # os.path.basename(filep))
     global current_dog_log
     current_dog_log = dog_ident_log
 
 
-def get_dog_id():
+def get_dog_log():
     if current_dog_log:
         return current_dog_log
