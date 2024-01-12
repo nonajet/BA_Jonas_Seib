@@ -27,8 +27,9 @@ if __name__ == '__main__':
 
     logger = logging.getLogger()  # logger.create_logger(dog_ident.replace(".xml", ".log"))
     abs_path, gait_id = set_params(walk_id, filename)
-    visualize(abs_path, gait_id, mx_start=0, visuals=False, total_view=False)
+    visualize(abs_path, gait_id, visuals=False, vis_from=0, mx_start=0, total_view=False)
     feature_creation.paw_validation()
+    feature_creation.calc_features()
 
     logger.info('####################################\nmovement (%s) '
                 'finished\n####################################' % gait_id)

@@ -41,6 +41,10 @@ class Paw(object):
         self.name = name
         self.lastContact = 0  # time steps since last time paw touched ground
         self.set_since = 0
+        if 'f' in name:
+            self.is_front = True
+        else:
+            self.is_front = False
 
     def lift(self):
         self.ground = False
@@ -98,7 +102,7 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
     elif paw_count == 1 and mylib.GAIT_TYPE == 1 and not mylib.two_paws:  # for Trab wait for at least 2 paws to start
         return
 
-    paw_on_ground = None  # only relevant for 1 paw case
+    paw_on_ground = None  # only relevant for 1 and 2 paw case
     paws_planted = 0
     # default for 1 - 3 paws ('backtracing')
     for paw_obj in get_active_paws():
@@ -113,7 +117,7 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
 
     if paw_count == 1 and not paw_on_ground:
         print('no paw at', start_ind[0])
-        paw_on_ground = get_max_airborne_paw(True)  # favors front paw when last_contact is tied
+        paw_on_ground = get_max_airborne_paw()  # todo:removed param (True) favors front paw when last_contact is tied
         if paw_on_ground:
             paw_on_ground.touch(start_ind[0])  # TODO: declaration not found
             print('code not broken yet...guessed new single paw')
@@ -124,12 +128,19 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
         front = min(start_ind)  # first distinction b/w front <=> back paw (smaller row means front)
         back = max(start_ind)
         if mylib.GAIT_TYPE:  # Trab
-            if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
-                FL.touch(front)  # TODO: test for already planted paws and missing paws
-                BR.touch(back)
+            ex_next_paw = get_max_airborne_paw()
+            # paws cannot be both front or both back
+            if paw_on_ground.is_front and not ex_next_paw.is_front:
+                ex_next_paw.touch(back)
+            elif not paw_on_ground.is_front and ex_next_paw.is_front:
+                ex_next_paw.touch(front)
             else:
-                FR.touch(front)
-                BL.touch(back)
+                if front[1] < back[1]:  # second dist. b/w left <=> right depending on what start_index is more left
+                    FL.touch(front)
+                    BR.touch(back)
+                else:
+                    FR.touch(front)
+                    BL.touch(back)
 
         else:  # Schritt
             # TODO: should not work correctly yet
@@ -348,7 +359,7 @@ def get_max_airborne_paw(only_front=False):  # returns paw obj. with highest tim
     max_t = -np.inf
     for paw_obj in TheDog.paws:
         if only_front:
-            if paw_obj.lastContact > max_t and 'f' in paw_obj.name:
+            if paw_obj.lastContact > max_t and paw_obj.is_front:
                 longest_air_paw = paw_obj
                 max_t = paw_obj.lastContact
         else:

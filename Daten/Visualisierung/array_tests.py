@@ -43,6 +43,5 @@ paw_obj3 = Paw('bl')
 paws = [paw_obj3, paw_obj2, paw_obj1]
 paw_dict = {'fl': -1, 'fr': 2, 'bl': 3, 'br': 10}
 
-mein_dict = {}
-
-print(mein_dict)
+arr = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+print(np.amax(arr))

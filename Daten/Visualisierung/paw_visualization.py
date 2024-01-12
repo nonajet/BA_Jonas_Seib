@@ -1,4 +1,5 @@
 import logging
+import sys
 import time
 import traceback
 
@@ -10,9 +11,9 @@ from Daten.Visualisierung.mylib import get_dog_log
 from paw_detection import paw_recognition, TheDog
 
 
-def visualize(filepath, _id, mx_start=0, visuals=True, total_view=False, mx_skip=1):
+def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_skip=1, vis_from=0):
     t1 = time.time()
-    # np.set_printoptions(threshold=sys.maxsize)
+    np.set_printoptions(threshold=sys.maxsize)
     log_namestring = get_dog_log()
     logger = logging.getLogger(log_namestring)
     matrix, offset = extract_matrices(filepath, _id)
@@ -26,8 +27,13 @@ def visualize(filepath, _id, mx_start=0, visuals=True, total_view=False, mx_skip
     ax_total = ax[2]
     total_mx = np.zeros((481, 64))
     plt.axis('off')
+
     fig_paws, axes_paws = plt.subplots(2, 2)
-    plt.figure(fig_paws)
+    if visuals:
+        plt.figure(fig_paws)
+    else:
+        plt.close(fig)
+        plt.close(fig_paws)
 
     mx_ctr = mx_start
     for mx in matrix[mx_start:]:
@@ -39,7 +45,7 @@ def visualize(filepath, _id, mx_start=0, visuals=True, total_view=False, mx_skip
             paw_recognition(mx_np, offset[mx_ctr], global_mx)
             logger.info('\n###################### id: %i ######################' % mx_ctr)
 
-            if visuals and mx_ctr % mx_skip == 0:
+            if visuals and mx_ctr % mx_skip == 0 and mx_ctr >= vis_from:
                 vis_paws(fig_paws, axes_paws)
 
                 # local
