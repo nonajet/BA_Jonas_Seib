@@ -1,19 +1,26 @@
 import copy
 import logging
+from collections import defaultdict
 
 import numpy as np
 
 from Daten.Visualisierung.mylib import get_dog_log
 
-UNINIT_VAL = ''  # default value for not yet initialised paws (order)
-raw_paw_order = []
-cleaned_paw_order = []
 
-
-class Paw(object):
+class FeatureContainer(object):
 
     def __init__(self):
+        self.cleaned_paw_order_names = []
+        self.no_of_steps = {}
         self.peak_pressure = {}
+        self.glob_paw_positions = {}
+        self.times_of_step_start = {}
+
+
+UNINIT_VAL = ''  # default value for not yet initialised paws (order)
+CELL_SIZE = 8.4688
+FC = FeatureContainer()
+raw_paw_order = []
 
 
 def save_paws(dog_paws):
@@ -96,33 +103,77 @@ def paw_validation():  # validates and creates dataset of validated paw steps
             tot_steps += 1
         t_step += 1
     print(doubtful_paws)
-    print(orders)
 
     if doubtful_paws:  # irregular paw order detected
-        global cleaned_paw_order
         t_min, t_max = get_max_valid_seq(doubtful_paws)  # TODO: 'backpropagation' of order onto faulty sequences
-        cleaned_paw_order = raw_paw_order[0:t_max]
+        cleaned_paw_order = raw_paw_order[t_min:t_max]
     else:
         cleaned_paw_order = raw_paw_order
 
+    return cleaned_paw_order
+
 
 def calc_features():
+    FC.cleaned_paw_order_names = paw_validation()
+    step_count, step_times_of_settling = count_steps()
+    FC.no_of_steps = step_count
+    FC.times_of_step_start = step_times_of_settling
+    FC.glob_paw_positions = calc_glob_pos_of_steps()
+
     logger = logging.getLogger(get_dog_log())
     logger.info(peak_pressure())
 
 
+def calc_glob_pos_of_steps():
+    glob_pos = defaultdict(list)
+    for key, val_list in FC.times_of_step_start.items():
+        for time in val_list:
+            for paw in FC.cleaned_paw_order_names[time]:
+                if paw.name is key:
+                    glob_pos[key].append(paw.global_pos)
+
+    print('glob pos:')
+    print(dict(glob_pos))
+    return dict(glob_pos)
+
+
+def count_steps():
+    steps = defaultdict(int)
+    step_times = defaultdict(list)
+    prev_paw_names = []
+    for index, paws_on_ground in enumerate(FC.cleaned_paw_order_names):
+        rec_paw_names = [paw.name for paw in paws_on_ground]
+        for paw_name in rec_paw_names:
+            if paw_name not in prev_paw_names:
+                steps[paw_name] += 1
+                step_times[paw_name].append(index)
+        prev_paw_names = rec_paw_names
+
+    print('steps:')
+    print(dict(steps))
+    print('step times:')
+    print(dict(step_times))
+    return dict(steps), dict(step_times)
+
+
+def step_length():
+    pass
+
+
 def peak_pressure():
-    pressures = {}
+    pressures = defaultdict(list)
     maximums = {'fl': -1, 'fr': -1, 'bl': -1, 'br': -1}
-    for paws_on_ground in cleaned_paw_order:
+    for paws_on_ground in FC.cleaned_paw_order_names:
         paw_names = [paw.name for paw in paws_on_ground]
         for key in maximums.keys():
             if key not in paw_names and maximums[key] != -1:  # reset max of non-touch. paws to def. after saving
-                pressures[key] = maximums
+                pressures[key].append(maximums[key])
                 maximums[key] = -1
         for paw in paws_on_ground:
             tmp_max = np.amax(paw.area)
             if tmp_max > maximums[paw.name]:
                 maximums[paw.name] = tmp_max
 
-    return pressures
+    print('peak pressures:')
+    print(dict(pressures))
+    return dict(pressures)

@@ -42,8 +42,9 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
             print('mx_ctr:', mx_ctr)
             mx_np = np.array(mx)
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
+            total_mx += global_mx
             paw_recognition(mx_np, offset[mx_ctr], global_mx)
-            logger.info('\n###################### id: %i ######################' % mx_ctr)
+            # logger.info('\n###################### id: %i ######################' % mx_ctr)
 
             if visuals and mx_ctr % mx_skip == 0 and mx_ctr >= vis_from:
                 vis_paws(fig_paws, axes_paws)
@@ -59,8 +60,8 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
 
                 if total_view:
                     # total (drains performance heavily)
-                    total_mx += global_mx
                     ax_total.imshow(total_mx)
+                    ax_total.set_title('total')
 
                 # plt.pause(0.000001)
                 # gc.collect()
@@ -76,7 +77,10 @@ def vis_paws(figure, axes):
 
     for paw_obj in TheDog.paws:
         try:
-            axes[paw_obj.ax_ind].matshow(paw_obj.area)
+            if paw_obj.ground:
+                axes[paw_obj.ax_ind].matshow(paw_obj.area)
+            else:
+                axes[paw_obj.ax_ind].cla()
             axes[paw_obj.ax_ind].set_title(paw_obj.name)
             axes[paw_obj.ax_ind].set_axis_off()
         except TypeError:
