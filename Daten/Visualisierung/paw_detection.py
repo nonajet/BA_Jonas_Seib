@@ -8,6 +8,7 @@ from scipy.ndimage import label
 import feature_creation
 import mylib
 
+# test: save point for future revert (if needed)
 
 class Dog(object):
     def __init__(self, front_left, front_right, back_left, back_right):
@@ -92,7 +93,7 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
     TheDog.prev_front_most_ind = TheDog.front_most_ind
     TheDog.front_most_ind = min(start_ind)
     TheDog.newly_planted_paws = set()
-    # test
+
     if len(paws) != len(start_ind):
         warnings.warn('no. of paws %i does not match no. of paw starting points:' % paw_count)
         print('paws:', paws, '\nstart_ind:', start_ind)
