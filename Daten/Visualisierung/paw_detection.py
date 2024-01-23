@@ -92,7 +92,7 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
     TheDog.prev_front_most_ind = TheDog.front_most_ind
     TheDog.front_most_ind = min(start_ind)
     TheDog.newly_planted_paws = set()
-
+    # test
     if len(paws) != len(start_ind):
         warnings.warn('no. of paws %i does not match no. of paw starting points:' % paw_count)
         print('paws:', paws, '\nstart_ind:', start_ind)
@@ -289,14 +289,10 @@ def get_paw_area(paw_cluster):  # return paw area without empty rows or col
     ret_mx = TheDog.local_mx.copy()
     ret_mx[~mask] = 0
 
-    non_zero_rows = np.any(ret_mx != 0, axis=1)
-    start_ind = np.argmax(non_zero_rows)
-    end_ind = len(TheDog.local_mx) - np.argmax(non_zero_rows[::-1])
+    non_zero_rows = [i for i, row in enumerate(ret_mx) if any(row)]
+    non_zero_cols = [i for i, col in enumerate(ret_mx.transpose()) if any(col)]
 
-    non_zero_cols = np.any(ret_mx != 0, axis=0)
-    col_start_ind = np.argmax(non_zero_cols)
-    col_end_ind = len(ret_mx[1]) - np.argmax(non_zero_cols[::-1])
-    return ret_mx[start_ind:end_ind, col_start_ind:col_end_ind]
+    return ret_mx[min(non_zero_rows):max(non_zero_rows) + 1, min(non_zero_cols):max(non_zero_cols) + 1]
 
 
 def find_nzero_clusters(matrix, neighbor_distance):  # values in matrix are used to find neighbouring (also diag.) elems

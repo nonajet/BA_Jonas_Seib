@@ -43,6 +43,8 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
             mx_np = np.array(mx)
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
             total_mx += global_mx
+            if mx_ctr == 110:
+                print('fail')
             paw_recognition(mx_np, offset[mx_ctr], global_mx)
             # logger.info('\n###################### id: %i ######################' % mx_ctr)
 
