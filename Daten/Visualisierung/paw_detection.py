@@ -82,7 +82,7 @@ def paw_recognition(matrix, local_mx_offset, global_mx):
     paw_count = len(paws)
     print('start_ind:', start_ind)
     print(paw_count, 'paw(s)')
-
+    # other test for other branch
     TheDog.local_mx = matrix
     TheDog.prev_offset = TheDog.offset
     TheDog.offset = local_mx_offset
