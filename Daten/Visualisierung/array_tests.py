@@ -1,28 +1,37 @@
+from matplotlib import pyplot as plt
+
 import numpy as np
+from skimage import measure
+from skimage.draw import disk
 
+a = np.arange(36).reshape(6, 6)
 
-class Paw(object):
-    def __init__(self, name, ground=False):
-        self.global_pos = (-1, -1)
-        self.ground = ground
-        self.name = name
+b = np.array([[0, 0, 0, 0, 0, 0],
+              [0, 7, 8, 9, 10, 0],
+              [0, 13, 14, 15, 16, 0],
+              [0, 19, 20, 21, 22, 0],
+              [0, 25, 26, 27, 28, 0],
+              [0, 0, 0, 0, 0, 0]])
 
+image = np.zeros((100, 100), dtype=np.uint8)
+rr, cc = disk((30, 30), radius=15)
+image[rr, cc] = 1
 
-paw_obj1 = Paw('fl')
-paw_obj2 = Paw('fr')
-paw_obj3 = Paw('bl')
-paws = [paw_obj3, paw_obj2, paw_obj1]
-paw_dict = {'fl': -1, 'fr': 2, 'bl': 3, 'br': 10}
+rr, cc = disk((70, 70), radius=20)
+image[rr, cc] = 2
 
+# Zeige das Beispielbild
+plt.imshow(image, cmap='gray')
+plt.title('Beispielbild mit zwei Regionen')
+plt.show()
+regions = measure.regionprops(image)
 
-def get_paw_area(_matrix):  # return paw area without empty rows or col
-    ret_mx = _matrix
+for region in regions:
+    print(f"\nRegion mit Label {region.label}:")
+    print(f"Fläche: {region.area}")
+    print(f"Schwerpunkt: {region.centroid}")
+    print(f"Bounding Box: {region.bbox}")
+    print(f"Perimeter: {region.perimeter}")
 
-    non_zero_rows = np.any(ret_mx != 0, axis=1)
-    start_index = np.argmax(non_zero_rows)
-    end_index = len(ret_mx) - np.argmax(non_zero_rows[::-1])
-
-    non_zero_cols = np.any(ret_mx != 0, axis=0)
-    col_start_ind = np.argmax(non_zero_cols)
-    col_end_ind = len(ret_mx[1]) - np.argmax(non_zero_cols[::-1])
-    return ret_mx[start_index:end_index, col_start_ind:col_end_ind]
+if __name__ == '__main__':
+    pass

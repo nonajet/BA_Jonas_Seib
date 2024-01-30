@@ -2,10 +2,12 @@ import logging
 import sys
 import time
 import traceback
+import warnings
 
 import numpy as np
 from matplotlib import pyplot as plt
 
+from Daten.Visualisierung import paw_detection
 from Daten.Visualisierung.extract_xml import extract_matrices, create_global_mx
 from Daten.Visualisierung.mylib import get_dog_log
 from paw_detection import paw_recognition, TheDog
@@ -42,6 +44,9 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
             print('mx_ctr:', mx_ctr)
             mx_np = np.array(mx)
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
+            if not paw_detection.valid_data(global_mx):  # TODO: check if dog walks across whole mat
+                warnings.warn('paws too close to edge. discarding data set')
+                quit(-1)
             total_mx += global_mx
             paw_recognition(mx_np, offset[mx_ctr], global_mx)
             # logger.info('\n###################### id: %i ######################' % mx_ctr)
