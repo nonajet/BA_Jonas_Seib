@@ -29,11 +29,11 @@ class Dog(object):
 
 
 class Paw(object):
-    def __init__(self, start_index, area, labeled_area, ax_ind, name=None, ground=False):
-        self.start_index = start_index
+    def __init__(self, ax_ind, name=None, ground=False):
+        self.start_index = (-1, -1)
         self.global_pos = (-1, -1)
-        self.area = area
-        self.labeled_area = labeled_area
+        self.area = [[]]
+        self.labeled_area = [[]]
         self.ground = ground
         self.ax_ind = ax_ind
         self.name = name
@@ -61,28 +61,29 @@ class Paw(object):
         self.props = skimage.measure.regionprops(self.labeled_area, self.area)
 
 
-A = Paw((-1, -1), [[]], [[]], (0, 0), 'A')
-B = Paw((-1, -1), [[]], [[]], (0, 1), 'B')
-C = Paw((-1, -1), [[]], [[]], (1, 0), 'C')
-D = Paw((-1, -1), [[]], [[]], (1, 1), 'D')
+A = Paw((0, 0), 'A')
+B = Paw((0, 1), 'B')
+C = Paw((1, 0), 'C')
+D = Paw((1, 1), 'D')
 TheDog = Dog(A, B, C, D)
 
 
-def paw_recognition(matrix, local_mx_offset, global_mx):
+def paw_recognition(matrix, local_mx_offset, global_mx, ctr):
     """
     detects number of paws on the mat. Areas with less than [_] cells between each other are considered one paw.
     :param matrix: local matrix from data set
     :param local_mx_offset: offset of local matrix
     :param global_mx: whole mat as matrix
+    :param ctr: number of matrix that is passed; mainly for easier debugging
     """
 
     paws, start_ind, labeled_mx = find_nzero_clusters(matrix, mylib.NEIGHBOR_DIST)
     paw_count = len(paws)
-    print('start_ind:', start_ind)
-    print(paw_count, 'paw(s)')
+    # print('start_ind:', start_ind)
+    # print(paw_count, 'paw(s)')
 
     TheDog.local_mx = matrix
-    TheDog.prev_offset = TheDog.offset
+    TheDog.prev_offset = TheDog.offset  # TODO: cleanup
     TheDog.offset = local_mx_offset
     TheDog.labeled_mx = labeled_mx
     TheDog.prev_global_mx = TheDog.global_mx

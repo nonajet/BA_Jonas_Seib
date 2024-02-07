@@ -13,25 +13,13 @@ b = np.array([[0, 0, 0, 0, 0, 0],
               [0, 25, 26, 27, 28, 0],
               [0, 0, 0, 0, 0, 0]])
 
-image = np.zeros((100, 100), dtype=np.uint8)
-rr, cc = disk((30, 30), radius=15)
-image[rr, cc] = 1
+list1 = [1, 2, 3, 4, 5]
+list2 = [3, 4, 5, 6, 7]
 
-rr, cc = disk((70, 70), radius=20)
-image[rr, cc] = 2
 
-# Zeige das Beispielbild
-plt.imshow(image, cmap='gray')
-plt.title('Beispielbild mit zwei Regionen')
-plt.show()
-regions = measure.regionprops(image)
-
-for region in regions:
-    print(f"\nRegion mit Label {region.label}:")
-    print(f"Fläche: {region.area}")
-    print(f"Schwerpunkt: {region.centroid}")
-    print(f"Bounding Box: {region.bbox}")
-    print(f"Perimeter: {region.perimeter}")
+neue_daten = ['Max', 25, 'Berlin', {'zusatz_info': 'Beispiel', 'status': 'aktiv'}]
+liste_fuer_csv = neue_daten[:-1] + [neue_daten[-1]['zusatz_info'], neue_daten[-1]['status']]
+print(liste_fuer_csv)
 
 if __name__ == '__main__':
     pass

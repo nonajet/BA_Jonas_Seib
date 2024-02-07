@@ -17,9 +17,10 @@ def get_cell_count(filepath, _id):  # not robustified yet
     return y, x
 
 
-def get_count(filepath, _id):  # get No. of matrices in one data set
-    movement = get_movement(filepath, _id)
-    return int(movement.find('.//zb:count', NS).text)
+def get_no_of_measures(filepath):
+    root = et.parse(filepath).getroot()
+    movements = root.findall('.//zb:movement', NS)
+    return len(movements)
 
 
 def get_movement(filepath, _id):

@@ -39,16 +39,16 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
 
     mx_ctr = mx_start
     for mx in matrix[mx_start:]:
-        if mx:
-            print('\n######################')
-            print('mx_ctr:', mx_ctr)
+        if mx:  # TODO: if mx is empty then restart paw order from there (eg. T0391053 - 5)
+            # print('\n######################')
+            # print('mx_ctr:', mx_ctr)
             mx_np = np.array(mx)
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
             if not paw_detection.valid_data(global_mx):  # TODO: check if dog walks across whole mat
                 warnings.warn('paws too close to edge. discarding data set')
                 quit(-1)
             total_mx += global_mx
-            paw_recognition(mx_np, offset[mx_ctr], global_mx)
+            paw_recognition(mx_np, offset[mx_ctr], global_mx, mx_ctr)
             # logger.info('\n###################### id: %i ######################' % mx_ctr)
 
             if visuals and mx_ctr % mx_skip == 0 and mx_ctr >= vis_from:

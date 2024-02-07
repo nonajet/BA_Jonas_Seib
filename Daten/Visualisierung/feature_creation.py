@@ -10,21 +10,30 @@ class FeatureContainer(object):
 
     def __init__(self):
         self.cleaned_paw_order_names = []
-        self.paw_props = []
+        self.paw_order_by_steps = {}  # each step per paw is separately saved
 
+        # misc
         self.no_of_steps = {}
         self.peak_pressure = {}
         self.step_lengths = {}  # in m
         self.step_length_no_of_matrices = {}  # in no. of matrices
+        self.avg_pres = {}
+        self.ratio_pres2area = {}
+        self.asc_peak_slopes = {}
+        self.des_peak_slopes = {}
 
+        # positions
         self.step_start_glob_paw_positions = {}
         self.peak_glob_positions = {}
         self.step_lift_glob_paw_positions = {}
+        self.paw_area_cm2 = {}
 
+        # times
         self.step_start_times = {}
         self.peak_times = {}
         self.step_lift_times = {}
         self.step_contact_durations = {}
+        self.air_times_durations = {}
         self.pace = -1
 
 
@@ -33,27 +42,84 @@ CELL_SIZE_MM = 8.4688  # in mm
 FREQ = 200
 FC = FeatureContainer()
 raw_paw_order = []
-raw_props = []
 
 
 def calc_features():
     FC.cleaned_paw_order_names = raw_paw_order
+    FC.paw_order_by_steps = get_ordered_paw_data()
 
     FC.no_of_steps, FC.step_start_times, FC.step_lift_times = count_steps()
     FC.step_start_glob_paw_positions = calc_glob_pos_of_steps()
     FC.step_length_no_of_matrices, FC.step_contact_durations = step_contact_time()
+    FC.air_times_durations = air_time()
     FC.peak_pressure, FC.peak_times, FC.peak_glob_positions = peak_pressure()
     FC.step_lengths_time = step_length()
     FC.pace = pace()
+    FC.paw_area_cm2, FC.avg_pres, FC.ratio_pres2area = region_properties()
+    FC.asc_peak_slopes, FC.des_peak_slopes = peak_slopes()
 
     # logger = logging.getLogger(get_dog_log())
     # logger.info(peak_pressure())
+    Features_comp = extract_relevant_feat()
+    return Features_comp
+
+
+def extract_relevant_feat():  # only copy features relevant for later feature selection
+    features = {}
+    relevant_iter = ['step_contact_durations',  # only iterable features
+                     'air_times_durations',
+                     'peak_pressure',
+                     'step_lengths_time',
+                     'paw_area_cm2',
+                     'avg_pres',
+                     'ratio_pres2area',
+                     'asc_peak_slopes',
+                     'des_peak_slopes']
+
+    for attr, val in vars(FC).items():
+        if attr in relevant_iter:
+            for paw_val in val:
+                key = attr + '_' + paw_val  # save feature for each paw
+                features[key] = np.round(np.median(val[paw_val]), 3)  # allow for each paw only one number
+
+    features['pace'] = FC.pace
+    return features
 
 
 def save_paws(dog_paws):
     assert dog_paws
     active_paws = [copy.copy(paw) for paw in dog_paws if paw.ground]
     raw_paw_order.append(active_paws)
+
+
+def get_ordered_paw_data():
+    """
+    orders each step of one paw as a list of adjacent paw-ground contacts.
+    As soon as paw is lifted (=step process is finished) that step for that paw is added to
+    the ordered paw data (=return value).
+    Is foundation for easier propregions calculation later on.
+    """
+    paw_data_per_paw_step = defaultdict(list)
+    rec_paws = []
+    step = defaultdict(list)
+    for paws_on_ground in FC.cleaned_paw_order_names:
+        for paw in paws_on_ground:  # each paw that sets down is added to step of their key
+            step[paw.name].append(paw)
+        paws_on_ground = dict({(paw_obj.name, paw_obj) for paw_obj in paws_on_ground})  # convert from list to dict
+        prev_paws = rec_paws
+        rec_paws = [keys for keys in paws_on_ground.keys()]
+        paws_lifted = list(set(prev_paws) - set(rec_paws))
+        if paws_lifted:
+            for paw_key in paws_lifted:  # asa paw lifts the whole step (as a list) is added to data_per_step
+                paw_data_per_paw_step[paw_key].append(step[paw_key])
+                step[paw_key] = []
+
+    for key in step:  # don't forget last paw(s) that are on last time step/matrix
+        if step[key]:
+            paw_data_per_paw_step[key].append(step[key])
+            step[key] = []
+
+    return dict(paw_data_per_paw_step)
 
 
 def calc_glob_pos_of_steps():
@@ -100,7 +166,29 @@ def count_steps():
 
 
 def region_properties():
-    pass
+    CONV_FAC = 8.5 * 8.5 / 100  # convert from cell area to cm²
+    step_area_cm2 = defaultdict(list)
+    avg_pres = defaultdict(list)
+    ratio_pres_area = defaultdict(list)
+    for key, steps in FC.paw_order_by_steps.items():
+        areas_in_step = []
+        avg_pres_in_step = []
+        for step in steps:
+            for paw_data in step:
+                areas_in_step.append(paw_data.props[0].area)
+                avg_pres_in_step.append(np.mean(paw_data.area[paw_data.area != 0]))  # ignore 0 values in mx for avg
+
+            avg_area_in_cm2 = np.mean(areas_in_step) * CONV_FAC
+            step_area_cm2[key].append(round(avg_area_in_cm2, 3))  # mean area for single step
+            areas_in_step = []
+
+            avg_pres[key].append(np.round(np.mean(avg_pres_in_step), 3))
+            avg_pres_in_step = []
+
+        ratio_pres_area[key].append(np.round(avg_pres[key][-1] / step_area_cm2[key][-1], 3))
+    # print('pres: ', dict(avg_pres))
+    # print('ratio: ', dict(ratio_pres_area))
+    return dict(step_area_cm2), dict(avg_pres), dict(ratio_pres_area)
 
 
 def pace():
@@ -119,11 +207,20 @@ def pace():
     return avg_pace
 
 
-def air_time():
-    air_t = defaultdict(list)
-    for key, times_list in FC.step_lift_times.items():
-        for ind in range(len(times_list)):
-            dur = FC.step_lift_times
+def air_time():  # expects step and lift time lists to be same length
+    air_t_matrices = defaultdict(list)
+    air_t_s = defaultdict(list)
+    for key, lift_times in FC.step_lift_times.items():
+        for ind in range(len(lift_times) - 1):
+            dur = FC.step_start_times[key][ind + 1] - FC.step_lift_times[key][ind]
+            air_t_matrices[key].append(dur)
+            air_t_s[key].append(dur / FREQ)
+
+    print('air times: (in #matrices)')
+    print(dict(air_t_matrices))
+    print('air times: (in s)')
+    print(dict(air_t_s))
+    return dict(air_t_s)
 
 
 def step_contact_time():  # time from setting to lifting a paw
@@ -141,11 +238,34 @@ def step_contact_time():  # time from setting to lifting a paw
         step_durations[paw] = [abs_contacts / FREQ for abs_contacts in
                                step_l[paw]]  # div. by FREQ since 200 matrices equal 1s
 
-    print('step contacts: (in #matrices)')
+    print('step durations: (in #matrices)')
     print(dict(step_l))
     print('step durations: (in s)')
     print(step_durations)
     return dict(step_l), step_durations
+
+
+def peak_slopes():
+    asc = defaultdict(list)
+    des = defaultdict(list)
+    starts = FC.step_start_times
+    ends = FC.step_lift_times
+    for key, peaks in FC.peak_times.items():
+        paw_asc = []
+        paw_des = []
+        for ind, peak_t in enumerate(peaks):
+            peak_val = FC.peak_pressure[key][ind]
+            asc_slope = peak_val / (abs(peak_t - starts[key][ind]))
+            paw_asc.append(asc_slope)
+            des_slope = peak_val / (abs(peak_t - ends[key][ind]))
+            paw_des.append(des_slope)
+
+        asc[key].append(np.round(np.mean(paw_asc), 3))
+        des[key].append(np.round(np.mean(paw_des), 3))
+
+    print('asc:', dict(asc))
+    print('des:', dict(des))
+    return dict(asc), dict(des)
 
 
 def peak_pressure():
