@@ -107,7 +107,7 @@ def paw_recognition(matrix, local_mx_offset, global_mx, ctr):
     for unused_start in start_ind:
         get_max_airborne_paw().touch(unused_start)
 
-    feature_creation.save_paws(TheDog.paws)
+    return TheDog.paws
 
 
 def compare_glob_pos(paw_obj, start_ind):  # param: one paw, all new paw areas

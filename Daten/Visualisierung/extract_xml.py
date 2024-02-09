@@ -32,7 +32,6 @@ def get_movement(filepath, _id):
 
 
 def set_movement_type(filepath):
-    print('file:', os.path.basename(filepath))
     if 'Schritt' in filepath:
         mylib.GAIT_TYPE = 0
     elif 'Trab' in filepath:
@@ -44,10 +43,10 @@ def set_movement_type(filepath):
 def set_direction(movement):
     if movement.find('.//zb:type', NS).text == 'forward':
         mylib.DIRECTION = 1
-        print('direction: forward')
+        # print('direction: forward')
     else:
         mylib.DIRECTION = 0
-        print('direction: backward')
+        # print('direction: backward')
 
 
 def extract_matrices(filepath, _id):
