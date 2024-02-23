@@ -8,22 +8,18 @@ def write_to_csv(csvpath, features):
     csv_path = csvpath
 
     relevant_features = get_rel_attr_as_dict(features)  # filters relevant features and returns them as dict
-    fields = get_attr_as_list(relevant_features)
+    relevant_features = dict(sorted(relevant_features.items()))
+    fields = list(relevant_features.keys())
 
-    # with open(csv_path, 'r', newline='') as csvfile:  # add header if necessary
-    #     first_k_lines = csvfile.readlines()[20:]
-    #     lines = ''.join(first_k_lines)
-    #     print('csv:', lines)
-    #     sniffer = csv.Sniffer()
-    #     header_needed = not sniffer.has_header(lines)
+    with open(csv_path, 'r+', newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        csv_as_str = ''.join(','.join(row) for row in reader)
+        if not csv_as_str or not csv.Sniffer().has_header(csv_as_str):  # TODO: always lazy eval?
+            writer = csv.DictWriter(csvfile, fieldnames=fields, delimiter=',')
+            writer.writeheader()
 
-    with open(csv_path, 'w', newline='') as csvfile:
+    with open(csv_path, 'a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fields, delimiter=',')
-        # if header_needed:
-        csvfile.seek(0)  # start of file
-        writer.writeheader()
-        csvfile.seek(2)  # end of file
-
         pprint(relevant_features)
         writer.writerows([relevant_features])
 
@@ -46,6 +42,7 @@ def get_rel_attr_as_dict(feature_container):  # only copy features relevant for 
                 key = attr + '_' + paw_val  # save feature for each paw
                 features[key] = np.round(np.median(val[paw_val]), 3)  # allow for each paw only one number
 
+    features['dog_id'] = feature_container.dog_id
     features['pace'] = feature_container.pace
     return features
 

@@ -12,7 +12,9 @@ FREQ = 200
 
 class FeatureContainer(object):
 
-    def __init__(self):
+    def __init__(self, dog_id=None):
+        self.dog_id = dog_id
+
         self.raw_paw_order = []
         self.cleaned_paw_order_names = []
         self.paw_order_by_steps = {}  # each step per paw is separately saved
@@ -45,15 +47,18 @@ class FeatureContainer(object):
         self.cleaned_paw_order_names = self.raw_paw_order
         self.get_ordered_paw_data()
 
-        self.count_steps()
+        if not self.count_steps():
+            return False
         self.calc_glob_pos_of_steps()
-        self.step_contact_time()
+        if not self.step_contact_time():
+            return False
         self.air_time()
         self.calc_peak_pressure()
         self.step_length()
         self.calc_pace()
         self.region_properties()
         self.peak_slopes()
+        return True
 
     def save_paws(self, dog_paws):
         active_paws = [copy.copy(paw) for paw in dog_paws if paw.ground]
@@ -119,10 +124,12 @@ class FeatureContainer(object):
         for last_paw in prev_paw_names:
             lift_times[last_paw].append(last_ind)
 
-        # print('\nsteps:', dict(steps))
-        # print('step times:', dict(step_times))
-        # print('lift times:', dict(lift_times))
         self.no_of_steps, self.step_start_times, self.step_lift_times = dict(steps), dict(step_times), dict(lift_times)
+
+        for val in steps:  # at least 2 steps per paw must be detected
+            if steps[val] < 2:
+                return False
+        return True
 
     def region_properties(self):
         CONV_FAC = 8.5 * 8.5 / 100  # convert from cell area to cm²
@@ -158,7 +165,6 @@ class FeatureContainer(object):
         dist = round(math.sqrt(x_square ** 2 + y_square ** 2), 3)
         avg_pace = round((dist / time) * 3.6, 2)
 
-        # print('pace: (in km/h)', avg_pace)
         self.pace = avg_pace
 
     def air_time(self):  # expects step and lift time lists to be same length
@@ -170,9 +176,6 @@ class FeatureContainer(object):
                 air_t_matrices[key].append(dur)
                 air_t_s[key].append(dur / FREQ)
 
-        # print('air times: (in #matrices)')
-        # print(dict(air_t_matrices))
-        # print('air t.: (in s)', dict(air_t_s))
         self.air_durations = dict(air_t_s)
 
     def step_contact_time(self):  # time from setting to lifting a paw
@@ -190,10 +193,12 @@ class FeatureContainer(object):
             step_durations[paw] = [abs_contacts / FREQ for abs_contacts in
                                    step_l[paw]]  # div. by FREQ since 200 matrices equal 1s
 
-        # print('step durations: (in #matrices)')
-        # print(dict(step_l))
-        # print('step dur.: (in s)', step_durations)
+        for val in step_l:
+            if any(dur <= 5 for dur in step_l[val]):  # discard measures for too short contact durations
+                return False
+
         self.step_length_no_of_matrices, self.contact_durations = dict(step_l), step_durations
+        return True
 
     def peak_slopes(self):
         asc = defaultdict(list)
@@ -221,8 +226,6 @@ class FeatureContainer(object):
             asc[key].append(np.round(np.mean(paw_asc), 3))
             des[key].append(np.round(np.mean(paw_des), 3))
 
-        # print('asc:', dict(asc))
-        # print('des:', dict(des))
         self.asc_peak_slopes, self.des_peak_slopes = dict(asc), dict(des)
 
     def calc_peak_pressure(self):
@@ -267,8 +270,6 @@ class FeatureContainer(object):
                 peak_glob_pos[key].append(tmp_glob_pos[key])
                 tmp_glob_pos[key] = (-1, -1)
 
-        # print('peak pressures:', dict(pressures))
-        # print('peak times:', dict(peak_times))
         self.peak_pressure, self.peak_times, self.peak_glob_positions = dict(pressures), dict(peak_times), dict(
             peak_glob_pos)
 
@@ -286,5 +287,4 @@ class FeatureContainer(object):
 
             step_l[paw_name] = step_dist
 
-        # print('step length: (in m)', step_l)
         self.step_lengths = step_l

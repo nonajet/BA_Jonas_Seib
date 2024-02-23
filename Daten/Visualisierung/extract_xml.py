@@ -84,6 +84,7 @@ def extract_matrices(filepath, _id):
 
 
 def create_global_mx(local_mx, offset):
+    assert local_mx.any()
     global_mx = np.zeros((481, 64))
     x_off = offset[1] - 1
     if x_off < 0: x_off = 0

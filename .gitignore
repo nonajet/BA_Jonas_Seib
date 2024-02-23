@@ -2,3 +2,5 @@
 *.pptx
 *.xml
 *.log
+*.csv
+!Trab_data.csv # provide sample data

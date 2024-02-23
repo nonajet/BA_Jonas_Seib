@@ -6,7 +6,6 @@ import skimage.measure
 
 from scipy.ndimage import label
 
-import feature_creation
 import mylib
 
 
@@ -19,11 +18,8 @@ class Dog(object):
         self.paws.append(back_right)
 
         self.local_mx = np.array([[]])
-        self.prev_offset = []
         self.offset = []
         self.labeled_mx = np.array([[]])
-        self.prev_global_mx = np.array([[]])
-        self.global_mx = np.array([[]])
 
         logging.getLogger(__name__)
 
@@ -68,44 +64,43 @@ D = Paw((1, 1), 'D')
 TheDog = Dog(A, B, C, D)
 
 
-def paw_recognition(matrix, local_mx_offset, global_mx, ctr):
+def paw_recognition(matrix, local_mx_offset, ctr):
     """
     detects number of paws on the mat. Areas with less than [_] cells between each other are considered one paw.
     :param matrix: local matrix from data set
     :param local_mx_offset: offset of local matrix
-    :param global_mx: whole mat as matrix
     :param ctr: number of matrix that is passed; mainly for easier debugging
     """
 
-    paws, start_ind, labeled_mx = find_nzero_clusters(matrix, mylib.NEIGHBOR_DIST)
-    paw_count = len(paws)
-    # print('start_ind:', start_ind)
-    # print(paw_count, 'paw(s)')
+    if matrix.any():
+        paws, start_ind, labeled_mx = find_nzero_clusters(matrix, mylib.NEIGHBOR_DIST)
+        paw_count = len(paws)
 
-    TheDog.local_mx = matrix
-    TheDog.prev_offset = TheDog.offset  # TODO: cleanup
-    TheDog.offset = local_mx_offset
-    TheDog.labeled_mx = labeled_mx
-    TheDog.prev_global_mx = TheDog.global_mx
-    TheDog.global_mx = global_mx
+        TheDog.local_mx = matrix
+        TheDog.offset = local_mx_offset
+        TheDog.labeled_mx = labeled_mx
 
-    if paw_count > 4:
-        warnings.warn('Dog has too many paws!')
+        if paw_count > 4:
+            warnings.warn('Dog has too many paws!')
 
-    for paw in TheDog.paws:
-        start = compare_glob_pos(paw, start_ind)
-        if type(paw) is Paw:
-            try:
-                if start in start_ind:  # found prev. paw start
-                    paw.touch(start)
-                    start_ind.remove(start)
-                else:
-                    paw.lift()
-            except TypeError as e:
-                raise Exception('at %i paw(s)' % paw_count) from e
+        for paw in TheDog.paws:
+            start = compare_glob_pos(paw, start_ind)
+            if type(paw) is Paw:
+                try:
+                    if start in start_ind:  # found prev. paw start
+                        paw.touch(start)
+                        start_ind.remove(start)
+                    else:
+                        paw.lift()
+                except TypeError as e:
+                    raise Exception('at %i paw(s)' % paw_count) from e
 
-    for unused_start in start_ind:
-        get_max_airborne_paw().touch(unused_start)
+        for unused_start in start_ind:
+            get_max_airborne_paw().touch(unused_start)
+
+    else:
+        for paw in TheDog.paws:
+            paw.lift()
 
     return TheDog.paws
 
@@ -198,13 +193,15 @@ def get_max_airborne_paw(only_front=False):  # returns paw obj. with highest tim
 
 
 def valid_data(global_mx, th_sides=1,
-               th_top=1):  # discard data if values are too close to the edge of mat
+               th_top=1):  # discard data if values are too close to the edge/ends of mat
     # th == threshold
-    top = global_mx[0:th_top].flat
-    bot = global_mx[-1:-th_top - 1:-1].flat
+    if not global_mx.any():  # empty global mx is valid
+        return True
+    # top = global_mx[0:th_top].flat
+    # bot = global_mx[-1:-th_top - 1:-1].flat
     left = global_mx[:, 0:th_sides].flat
     right = global_mx[:, -1:-th_sides - 1:-1].flat
-    combined = list(np.concatenate([top, bot, left, right]))
+    combined = list(np.concatenate([left, right]))  # top, bot,
     if np.any(combined):
         return False
     else:
