@@ -80,5 +80,6 @@ fabric.properties
 # added ignores
 __*/
 PDF/
+BA_sonstiges/
 Rohdaten/
 *.ods

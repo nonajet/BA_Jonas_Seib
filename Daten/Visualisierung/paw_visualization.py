@@ -56,7 +56,7 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
         else:
             streak += 1
-            global_mx = np.zeros((481, 64))  # global is only zeros if local was empty
+            global_mx = np.zeros((481, 64))  # global is zeros only if local was empty
         if not paw_detection.valid_data(global_mx):
             raise UserWarning('paws too close to edge')
         total_mx += global_mx
@@ -67,16 +67,17 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
             vis_paws(fig_paws, axes_paws)
 
             # local
-            ax_local.imshow(mx_np)
-            ax_local.set_axis_off()
+            if mx_np.any():
+                ax_local.imshow(mx_np)
+                ax_local.set_axis_off()
             # ax_local.imshow(np.flipud(np.fliplr(mx_np)))  # rot. 180° to fit glob. view direction
 
             # global
             ax_global.imshow(global_mx)
             ax_global.set_axis_off()
 
+            # total (drains performance heavily)
             if total_view:
-                # total (drains performance heavily)
                 ax_total.imshow(total_mx)
                 ax_total.set_title('total')
 

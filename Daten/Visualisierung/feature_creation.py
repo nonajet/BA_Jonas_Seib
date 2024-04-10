@@ -2,6 +2,7 @@ import copy
 import math
 import warnings
 from collections import defaultdict
+from pprint import pprint
 
 import numpy as np
 
@@ -16,8 +17,9 @@ class FeatureContainer(object):
         self.dog_id = dog_id
 
         self.raw_paw_order = []
-        self.cleaned_paw_order_names = []
+        self.paws_time_order = []
         self.paw_order_by_steps = {}  # each step per paw is separately saved
+        self.paw_name_per_step = []  # names of all paws which touch the ground at each time slot
 
         # misc
         self.no_of_steps = {}
@@ -44,8 +46,8 @@ class FeatureContainer(object):
         self.pace = -1
 
     def calc_features(self):
-        self.cleaned_paw_order_names = self.raw_paw_order
-        self.get_ordered_paw_data()
+        self.paws_time_order = self.raw_paw_order
+        self.paw_order_by_steps, self.paw_name_per_step = self.get_ordered_paw_data()
 
         if not self.count_steps():
             return False
@@ -72,14 +74,16 @@ class FeatureContainer(object):
         Is foundation for easier propregions calculation later on.
         """
         paw_data_per_paw_step = defaultdict(list)
+        paw_name_per_step = []
         rec_paws = []
         step = defaultdict(list)
-        for paws_on_ground in self.cleaned_paw_order_names:
+        for paws_on_ground in self.paws_time_order:
             for paw in paws_on_ground:  # each paw that sets down is added to step of their key
                 step[paw.name].append(paw)
             paws_on_ground = dict({(paw_obj.name, paw_obj) for paw_obj in paws_on_ground})  # convert from list to dict
             prev_paws = rec_paws
             rec_paws = [keys for keys in paws_on_ground.keys()]
+            paw_name_per_step.append(sorted(rec_paws))
             paws_lifted = list(set(prev_paws) - set(rec_paws))
             if paws_lifted:
                 for paw_key in paws_lifted:  # asa paw lifts the whole step (as a list) is added to data_per_step
@@ -91,13 +95,15 @@ class FeatureContainer(object):
                 paw_data_per_paw_step[key].append(step[key])
                 step[key] = []
 
-        self.paw_order_by_steps = dict(paw_data_per_paw_step)
+        for i in range(len(paw_name_per_step)):
+            print(i, paw_name_per_step[i])
+        return dict(paw_data_per_paw_step), paw_name_per_step
 
     def calc_glob_pos_of_steps(self):
         glob_pos = defaultdict(list)
         for key, val_list in self.step_start_times.items():
             for time in val_list:
-                for paw in self.cleaned_paw_order_names[time]:
+                for paw in self.paws_time_order[time]:
                     if paw.name is key:
                         glob_pos[key].append(paw.global_pos)
 
@@ -109,7 +115,7 @@ class FeatureContainer(object):
         lift_times = defaultdict(list)
         prev_paw_names = []
         last_ind = 0
-        for index, paws_on_ground in enumerate(self.cleaned_paw_order_names):
+        for index, paws_on_ground in enumerate(self.paws_time_order):
             rec_paw_names = [paw.name for paw in paws_on_ground]
             for paw_name in rec_paw_names:
                 if paw_name not in prev_paw_names:  # paw stepped down
@@ -156,9 +162,9 @@ class FeatureContainer(object):
             ratio_pres_area)
 
     def calc_pace(self):
-        time = len(self.cleaned_paw_order_names) / FREQ
-        start_pos = self.cleaned_paw_order_names[0][0].global_pos
-        end_pos = self.cleaned_paw_order_names[-1][0].global_pos
+        time = len(self.paws_time_order) / FREQ
+        start_pos = self.paws_time_order[0][0].global_pos
+        end_pos = self.paws_time_order[-1][0].global_pos
 
         x_square = abs(end_pos[0] - start_pos[0]) * CELL_SIZE_MM / 1000
         y_square = abs((end_pos[1] - start_pos[1])) * CELL_SIZE_MM / 1000
@@ -236,7 +242,7 @@ class FeatureContainer(object):
         maximums = {'A': -1, 'B': -1, 'C': -1, 'D': -1}
         tmp_times = {'A': -1, 'B': -1, 'C': -1, 'D': -1}
         tmp_glob_pos = {'A': (-1, -1), 'B': (-1, -1), 'C': (-1, -1), 'D': (-1, -1)}
-        for paws_on_ground in self.cleaned_paw_order_names:
+        for paws_on_ground in self.paws_time_order:
             ctr += 1
             paw_names = [paw.name for paw in paws_on_ground]
             for key in maximums.keys():

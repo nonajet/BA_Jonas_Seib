@@ -73,6 +73,8 @@ def paw_recognition(matrix, local_mx_offset, ctr):
     """
 
     if matrix.any():
+        if ctr == 221 or ctr == 286 or ctr == 340:  # 114
+            print('here')
         paws, start_ind, labeled_mx = find_nzero_clusters(matrix, mylib.NEIGHBOR_DIST)
         paw_count = len(paws)
 
@@ -88,6 +90,7 @@ def paw_recognition(matrix, local_mx_offset, ctr):
             if type(paw) is Paw:
                 try:
                     if start in start_ind:  # found prev. paw start
+                        glob_pos = calc_global_pos(start)  # debugging
                         paw.touch(start)
                         start_ind.remove(start)
                     else:
