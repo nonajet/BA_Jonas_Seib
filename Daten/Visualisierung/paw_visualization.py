@@ -45,17 +45,11 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
         del offset[-1]
 
     mx_ctr = mx_start
-    streak = 0
-    longest = 0
     for mx in matrix[mx_ctr:]:
         mx_np = mx
         if mx_np.any():
-            if streak > longest:
-                longest = streak
-            streak = 0
             global_mx = create_global_mx(mx_np, offset[mx_ctr])
         else:
-            streak += 1
             global_mx = np.zeros((481, 64))  # global is zeros only if local was empty
         if not paw_detection.valid_data(global_mx):
             raise UserWarning('paws too close to edge')
@@ -83,7 +77,6 @@ def visualize(filepath, _id, mx_start=0, visuals=False, total_view=False, mx_ski
 
         mx_ctr += 1
 
-    print('max:', longest)
     # only total at the end
     # fig, ax = plt.subplots(1, 1)
     # ax.imshow(total_mx)

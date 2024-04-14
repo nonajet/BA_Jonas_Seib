@@ -35,7 +35,9 @@ class Paw(object):
         self.name = name
         self.lastContact = 0  # time steps since last time paw touched ground
         self.set_since = 0
+        self.time = -1
         self.props = None
+        self.valid = True
 
     def lift(self):
         self.ground = False
@@ -47,7 +49,7 @@ class Paw(object):
         self.set_since = 0
         self.props = None
 
-    def touch(self, start_index):
+    def touch(self, start_index, time):
         self.ground = True
         self.start_index = start_index
         self.area, self.labeled_area = get_paw_area(TheDog.labeled_mx[start_index])
@@ -55,6 +57,7 @@ class Paw(object):
         self.lastContact = 0
         self.set_since += 1
         self.props = skimage.measure.regionprops(self.labeled_area, self.area)
+        self.time = time
 
 
 A = Paw((0, 0), 'A')
@@ -69,12 +72,10 @@ def paw_recognition(matrix, local_mx_offset, ctr):
     detects number of paws on the mat. Areas with less than [_] cells between each other are considered one paw.
     :param matrix: local matrix from data set
     :param local_mx_offset: offset of local matrix
-    :param ctr: number of matrix that is passed; mainly for easier debugging
+    :param ctr: number of matrix that is passed
     """
 
     if matrix.any():
-        if ctr == 221 or ctr == 286 or ctr == 340:  # 114
-            print('here')
         paws, start_ind, labeled_mx = find_nzero_clusters(matrix, mylib.NEIGHBOR_DIST)
         paw_count = len(paws)
 
@@ -91,7 +92,7 @@ def paw_recognition(matrix, local_mx_offset, ctr):
                 try:
                     if start in start_ind:  # found prev. paw start
                         glob_pos = calc_global_pos(start)  # debugging
-                        paw.touch(start)
+                        paw.touch(start, ctr)
                         start_ind.remove(start)
                     else:
                         paw.lift()
@@ -99,7 +100,7 @@ def paw_recognition(matrix, local_mx_offset, ctr):
                     raise Exception('at %i paw(s)' % paw_count) from e
 
         for unused_start in start_ind:
-            get_max_airborne_paw().touch(unused_start)
+            get_max_airborne_paw().touch(unused_start, ctr)
 
     else:
         for paw in TheDog.paws:

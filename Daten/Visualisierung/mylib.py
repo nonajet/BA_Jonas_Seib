@@ -1,7 +1,7 @@
 # handling constants and flags
 GAIT_TYPE = -1  # 0 == Schritt/walk; 1 == Trab/trot
 DIRECTION = -1  # 0 == backward; 1 == forward;
-NEIGHBOR_DIST = 10
+NEIGHBOR_DIST = 4
 
 dirname = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten'
 

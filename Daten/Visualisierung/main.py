@@ -27,7 +27,7 @@ def set_logger(logname):
 if __name__ == '__main__':
     csv_file = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\dog_features_data.csv'
     filename = r'T0430357 Trab.xml'  # r'T0403495 Trab.xml' todo  # T0430357, T
-    walk_id = '1'
+    walk_id = '2'
     base_dir = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten'
     logger = set_logger('features.log')  # logger.create_logger(dog_ident.replace(".xml", ".log"))
 
@@ -36,8 +36,8 @@ if __name__ == '__main__':
         try:
             gait = 'gait_' + walk_id
             Features = visualize(os.path.join(base_dir, filename), gait,
-                                 visuals=True, vis_from=0, mx_start=0,
-                                 total_view=False)
+                                 visuals=False, vis_from=0, mx_start=0,
+                                 total_view=False, mx_skip=1)
             Features.calc_features()
         except UserWarning as uw:
             warnings.warn("'{}': unreliable data ({})".format(filename, uw.args))

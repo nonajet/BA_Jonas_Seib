@@ -43,10 +43,10 @@ def set_movement_type(filepath):
 def set_direction(movement):
     if movement.find('.//zb:type', NS).text == 'forward':
         mylib.DIRECTION = 1
-        # print('direction: forward')
+        print('direction: forward')
     else:
         mylib.DIRECTION = 0
-        # print('direction: backward')
+        print('direction: backward')
 
 
 def extract_matrices(filepath, _id):
