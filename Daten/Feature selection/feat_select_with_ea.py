@@ -26,7 +26,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 
 dtc = DecisionTreeClassifier()
 svc = SVC()
-knn = KNeighborsClassifier()
+knn = KNeighborsClassifier()  # RadiusNeighborsClassifier?
 
 cv = StratifiedKFold(shuffle=True, random_state=42)
 
@@ -36,7 +36,7 @@ crossover_scheduler = ExponentialAdapter(0.2, 0.9, 0.05)
 ea_estm = GAFeatureSelectionCV(
     estimator=svc,
     cv=cv,
-    scoring="accuracy",
+    scoring="f1",
     generations=50,  # 70,
     population_size=100,
     crossover_probability=crossover_scheduler,  # 0.7,

@@ -23,20 +23,21 @@ class StepSeq(object):
         self.end = -1
         self.peak = -1
         self.pos = (-1, -1)
-        self.was_overtkn = []
-        self.overtook = []
+        self.paws_after = []
+        self.paws_before = []
         self.parallel = []
-        self.front = []
-        self.back = []
+        self.was_front_of = []
+        self.was_back_of = []
+
+        self.seq_prll = []
 
 
 def create_seq(steps_nAssigned):
     seqs = []
     for step in steps_nAssigned:
         seq = StepSeq(step)
-        # seq.paw_seq = step
         seq.start = step[0].time
-        seq.pos = step[0].global_pos
+        # seq.pos = step[0].global_pos
         seq.end = step[-1].time
         seqs.append(seq)
     return seqs
@@ -102,13 +103,7 @@ class FeatureContainer(object):
         self.calc_parallel_paws()
         self.count_front_occ()
 
-        # RENAMING
-        # for i, step in enumerate(self.sorted_peak_times):
-        #     paw_name_key = letter[i % 4]
-        #     for tframe in steps_nAssigned[step[0]]:
-        #         tframe.name = paw_name_key  # rewrite each paws internal name according to new order
-        #     self.paw_order_by_steps[paw_name_key].append(steps_nAssigned[step[0]])
-        # fill w new assigned/named pawsteps
+        self.rename_seq()
 
         # feature calculation
         if not self.count_steps_glob_pos():
@@ -136,6 +131,7 @@ class FeatureContainer(object):
                     peak_frame = tframe
 
             seq.peak = peak_frame.time
+            seq.pos = peak_frame.global_pos
 
     def calc_peak_times(self, unassigned_steps):
         pressures = defaultdict(list)
@@ -346,19 +342,26 @@ class FeatureContainer(object):
 
         self.step_lengths = step_l
 
-    def calc_parallel_paws(self):
+    def calc_parallel_paws(self):  # calc all paws which touch ground at same time
         for seq in self.paw_order_by_time:
             t_start = seq.start
             t_end = seq.end
             for other in self.paw_order_by_time:
+                other_s = other.start
+                other_e = other.end
                 if seq is not other:
-                    if t_start < other.start <= t_end:
-                        seq.was_overtkn.append(other)
+                    if other.end < t_start or t_end < other.start:  # not simultan. on ground
+                        pass
+                    elif t_start < other.start:  # <= t_end:
+                        seq.paws_after.append(other)
                         seq.parallel.append(other)
-                    elif t_start <= other.end <= t_end:
-                        seq.overtook.append(other)
+                    elif other.start < t_start:  # t_start <= other.end <= t_end:
+                        seq.paws_before.append(other)
                         seq.parallel.append(other)
-                    # TODO both cases simultaneously?
+                    elif other.start == t_start:  # same time of contact --> count as before & after simultan.
+                        seq.parallel.append(other)
+                        seq.paws_after.append(other)
+                        seq.paws_before.append(other)
 
     def count_front_occ(self):
         for seq in self.paw_order_by_time:
@@ -367,15 +370,22 @@ class FeatureContainer(object):
             my_pos = seq.pos
             for other in seq.parallel:
                 if mylib.DIRECTION == 0:
-                    if my_pos[0] > other.pos[0]:
-                        seq.front.append(other)
+                    if my_pos[0] < other.pos[0]:  # 0 == backwards
+                        seq.was_front_of.append(other)
                     else:
-                        other.back.append(seq)
+                        seq.was_back_of.append(other)
                 else:
-                    if my_pos[0] < other.pos[0]:
-                        seq.front.append(other)
+                    if my_pos[0] > other.pos[0]:  # 1 == forward
+                        seq.was_front_of.append(other)
                     else:
-                        other.back.append(seq)
+                        seq.was_back_of.append(other)
+
+    def rename_seq(self):
+        # reset all names
+        for seq in self.paw_order_by_time:
+            paw_name_key = ''
+            for tframe in seq:
+                tframe.name = paw_name_key
 
 
 def visualize_data(feature_container, visuals=False, total_view=False, mx_start=0, mx_skip=1, vis_from=0):
