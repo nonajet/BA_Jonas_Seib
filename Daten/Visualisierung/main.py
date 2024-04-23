@@ -25,9 +25,9 @@ def set_logger(logname):
 
 
 if __name__ == '__main__':
-    csv_file = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\dog_features_data.csv'
+    csv_file = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\dog_features_data_front_back.csv'
     filename = r'T0430357 Trab.xml'  # r'T0403495 Trab.xml' todo  # T0430357, T
-    walk_id = '2'
+    walk_id = '1'
     base_dir = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten'
     logger = set_logger('features.log')  # logger.create_logger(dog_ident.replace(".xml", ".log"))
 

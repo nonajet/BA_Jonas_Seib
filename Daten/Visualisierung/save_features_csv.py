@@ -31,10 +31,12 @@ def get_rel_attr_as_dict(feature_container):  # only copy features relevant for 
                 'step_lengths',
                 'peak_pressure',
                 'avg_pres',
-                'paw_area_cm2',
+                'paw_area',
                 'ratio_pres2area',
                 'asc_peak_slopes',
-                'des_peak_slopes']
+                'des_peak_slopes',
+                'vert_forces',
+                'impulses']
 
     for attr, val in vars(feature_container).items():
         if attr in relevant:

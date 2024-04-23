@@ -2,12 +2,10 @@ import copy
 import math
 import sys
 import traceback
-import warnings
-from collections import defaultdict
-
 import numpy as np
-from matplotlib import pyplot as plt
 
+from collections import defaultdict
+from matplotlib import pyplot as plt
 from Daten.Visualisierung import mylib
 
 CELL_SIZE_MM = 8.4688  # in mm
@@ -19,17 +17,19 @@ letter = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
 class StepSeq(object):
     def __init__(self, paw_seq):
         self.paw_seq = paw_seq
+
         self.start = -1
         self.end = -1
-        self.peak = -1
         self.pos = (-1, -1)
+
+        self.peak_t = -1
+        self.peak_val = -1
+
         self.paws_after = []
         self.paws_before = []
         self.parallel = []
         self.was_front_of = []
         self.was_back_of = []
-
-        self.seq_prll = []
 
 
 def create_seq(steps_nAssigned):
@@ -37,7 +37,6 @@ def create_seq(steps_nAssigned):
     for step in steps_nAssigned:
         seq = StepSeq(step)
         seq.start = step[0].time
-        # seq.pos = step[0].global_pos
         seq.end = step[-1].time
         seqs.append(seq)
     return seqs
@@ -62,15 +61,16 @@ class FeatureContainer(object):
         self.step_lengths = {}  # in m
         self.step_length_no_of_matrices = {}  # in no. of matrices
         self.avg_pres = {}
+        self.vert_forces = {}
         self.ratio_pres2area = {}
         self.asc_peak_slopes = {}
         self.des_peak_slopes = {}
-
+        self.impulses = {}
         # positions
         self.step_start_glob_pos = {}
         self.peak_glob_positions = {}
         self.step_lift_glob_pos = {}
-        self.paw_area_cm2 = {}
+        self.paw_area = {}
 
         # times
         self.step_start_times = {}  # 'times' refers to index of the event (e.g. start of step)
@@ -83,7 +83,7 @@ class FeatureContainer(object):
 
     def calc_features(self):
         self.paws_time_order = self.raw_paw_order
-        # cleanup time order (delete noise, TODO delete paw names)
+        # cleanup time order (delete noise)
         self.paw_order_by_steps = self.get_ordered_paw_data_by_name()  # used to group adj. paw steps
         steps_nAssigned = []  # reassign paw names while filtering noisy data/steps
         for paw_key in self.paw_order_by_steps:
@@ -97,30 +97,33 @@ class FeatureContainer(object):
 
         step_seqs = create_seq(steps_nAssigned)
         self.paw_order_by_time = sorted(step_seqs, key=lambda x: x.start)
+        self.set_peak_data()
         self.paw_order_by_dist = sorted(step_seqs, key=lambda x: x.pos[0], reverse=self.direction)
-        self.calc_peaks()
-        self.sorted_peak_times = sorted(step_seqs, key=lambda x: x.peak)  # sort all steps by their peak time value
+        self.sorted_peak_times = sorted(step_seqs, key=lambda x: x.peak_t)  # sort all steps by their peak_t time value
         self.calc_parallel_paws()
         self.count_front_occ()
 
         self.rename_seq()
+        self.paw_order_by_steps = {}  # unusable after renaming
+        self.group_by_paws()  # usable again
 
         # feature calculation
         if not self.count_steps_glob_pos():
             return False
         # self.calc_glob_pos_of_steps()
         self.step_contact_time()
-        self.calc_peak_times(steps_nAssigned)
-        self.air_time()
+        self.calc_peak_times()
+        # self.air_time()
         self.step_length()
         self.calc_pace()
         self.region_properties()
         self.peak_slopes()
 
-        visualize_data(self, visuals=True, total_view=False, mx_skip=1, mx_start=0, vis_from=0)
+        visualize_data(self.paws_time_order, visuals=False, total_view=True, mx_skip=2, mx_start=0, vis_from=0,
+                       paws=True)
         return True
 
-    def calc_peaks(self):
+    def set_peak_data(self):
         for seq in self.paw_order_by_time:
             step_max = -1.0
             peak_frame = None
@@ -130,35 +133,20 @@ class FeatureContainer(object):
                     step_max = tmp_max
                     peak_frame = tframe
 
-            seq.peak = peak_frame.time
+            seq.peak_t = peak_frame.time
+            seq.peak_val = np.amax(peak_frame.area)
             seq.pos = peak_frame.global_pos
 
-    def calc_peak_times(self, unassigned_steps):
-        pressures = defaultdict(list)
+    def calc_peak_times(self):
         peak_times = defaultdict(list)
         peak_glob_pos = defaultdict(list)
-        for nr, step in enumerate(unassigned_steps):
-            step_max = -1.0
-            peak_frame = None
-            for i, tframe in enumerate(step):
-                tmp_max = np.amax(tframe.area)
-                if tmp_max > step_max:
-                    step_max = tmp_max
-                    peak_frame = tframe
-
-            key = peak_frame.name
-            pressures[key].append(step_max)
-            peak_times[key].append(peak_frame.time)
-            peak_glob_pos[key].append(peak_frame.global_pos)
-
-        for k in pressures.keys():
-            pressures[k].sort()
-            peak_times[k].sort()
-            peak_glob_pos[k].sort()
+        for seq in self.paw_order_by_time:
+            key = seq.name
+            peak_times[key].append(seq.peak_t)
+            peak_glob_pos[key].append(seq.pos)
 
         self.peak_times = dict(peak_times)
         self.peak_glob_positions = dict(peak_glob_pos)
-        # self.peak_pressure = dict(pressures)
 
     def save_paws(self, dog_paws):
         active_paws = [copy.copy(paw) for paw in dog_paws if paw.ground]
@@ -214,14 +202,18 @@ class FeatureContainer(object):
 
         start_glob_pos = defaultdict(list)
         lift_glob_pos = defaultdict(list)
-        for paw_key, strides in self.paw_order_by_steps.items():
-            steps[paw_key] = len(strides)
-            for step_ind in range(len(strides)):
-                step_times[paw_key].append(strides[step_ind][0].time)
-                start_glob_pos[paw_key].append(strides[step_ind][0].global_pos)
+        for seq in self.paw_order_by_time:
+            paw_key = seq.name
+            steps[paw_key] += 1
+            step_times[paw_key].append(seq.start)
+            start_glob_pos[paw_key].append(seq.paw_seq[0].global_pos)
 
-                lift_times[paw_key].append(strides[step_ind][-1].time)
-                lift_glob_pos[paw_key].append(strides[step_ind][-1].global_pos)
+            lift_times[paw_key].append(seq.end)
+            lift_glob_pos[paw_key].append(seq.paw_seq[-1].global_pos)
+
+        for val in steps:  # at least 2 steps per paw must be detected
+            if steps[val] < 2:
+                return False
 
         self.no_of_steps = dict(steps)
         self.step_start_times = dict(step_times)
@@ -229,40 +221,54 @@ class FeatureContainer(object):
 
         self.step_start_glob_pos = dict(start_glob_pos)
         self.step_lift_glob_pos = dict(lift_glob_pos)
-
-        for val in steps:  # at least 2 steps per paw must be detected
-            if steps[val] < 2:
-                return False
         return True
 
     def region_properties(self):
         CONV_FAC = 8.5 * 8.5 / 100  # convert from cell area to cm²
-        step_area_cm2 = defaultdict(list)
+
+        step_area = defaultdict(list)
         avg_pres = defaultdict(list)
         ratio_pres_area = defaultdict(list)
-        for key, steps in self.paw_order_by_steps.items():
+        vert_forces = defaultdict(list)
+        impulses = defaultdict(list)
+
+        for seq in self.paw_order_by_time:
+            key = seq.name
             areas_in_step = []
             avg_pres_in_step = []
-            for step in steps:
-                for paw_data in step:
-                    areas_in_step.append(paw_data.props[0].area)
-                    avg_pres_in_step.append(np.mean(paw_data.area[paw_data.area != 0]))  # ignore 0 values in mx for avg
+            forces_in_step = []
 
-                avg_area_in_cm2 = np.mean(areas_in_step) * CONV_FAC
-                step_area_cm2[key].append(round(avg_area_in_cm2, 3))  # mean area for single step
-                areas_in_step = []
+            for step in seq.paw_seq:
+                area = step.props[0].area  # given in number of cells
+                areas_in_step.append(area)
+                avg_pres_in_step.append(np.round(np.mean(step.area[step.area != 0]), 3))  # ignore 0 val for avg
 
-                avg_pres[key].append(np.round(np.mean(avg_pres_in_step), 3))
-                avg_pres_in_step = []
+                force = np.sum(step.area) * CONV_FAC  # in N; [pressure * area]
+                forces_in_step.append(np.round(force, 3))
 
-            ratio_pres_area[key].append(np.round(avg_pres[key][-1] / step_area_cm2[key][-1], 3))
-        self.paw_area_cm2, self.avg_pres, self.ratio_pres2area = dict(step_area_cm2), dict(avg_pres), dict(
-            ratio_pres_area)
+            m_force = np.mean(forces_in_step)
+            paw_impulse = m_force * (len(seq.paw_seq) / FREQ)  # convert to N*s
+            impulses[key].append(np.round(paw_impulse, 3))
 
-    def calc_pace(self):
+            avg_area_in_cm2 = np.mean(areas_in_step) * CONV_FAC
+            step_area[key].append(round(avg_area_in_cm2, 3))  # mean area for single step sequence
+            avg_pres[key].append(np.round(np.mean(avg_pres_in_step), 3))
+
+            vert_forces[key].append(np.round(m_force, 3))
+
+            # append value of newest step sequence of that paw
+            ratio_pres_area[key].append(np.round(avg_pres[key][-1] / step_area[key][-1], 3))
+
+        self.paw_area = dict(step_area)
+        self.avg_pres = dict(avg_pres)
+        self.ratio_pres2area = dict(ratio_pres_area)
+        self.vert_forces = dict(vert_forces)
+        self.impulses = dict(impulses)
+
+    def calc_pace(self):  # in km/h
         time = len(self.paws_time_order) / FREQ
-        start_pos = self.paws_time_order[0][0].global_pos
-        end_pos = self.paws_time_order[-1][0].global_pos
+        start_pos = self.paw_order_by_time[0].pos
+        end_pos = self.paw_order_by_time[-1].pos
 
         x_square = abs(end_pos[0] - start_pos[0]) * CELL_SIZE_MM / 1000
         y_square = abs((end_pos[1] - start_pos[1])) * CELL_SIZE_MM / 1000
@@ -271,26 +277,22 @@ class FeatureContainer(object):
 
         self.pace = avg_pace
 
-    def air_time(self):  # expects step and lift time lists to be same length
-        air_t_matrices = defaultdict(list)
+    def air_time(self):  # not usable due to mixed up paw pairs
+        air_t_matrices = defaultdict(list)  # not used as output feature
         air_t_s = defaultdict(list)
-        for key, lift_times in self.step_lift_times.items():
-            for ind in range(len(lift_times) - 1):
-                dur = self.step_start_times[key][ind + 1] - self.step_lift_times[key][ind]
-                air_t_matrices[key].append(dur)
-                air_t_s[key].append(dur / FREQ)
+        for seq in self.paw_order_by_time:
+            key = seq.name
+            dur = seq.end - seq.start  # TODO: subtract start of x+1 from end of x
+            air_t_matrices[key].append(dur)
+            air_t_s[key].append(dur / FREQ)
 
-        self.air_durations = dict(air_t_s)
+        # self.air_durations = dict(air_t_s)
 
     def step_contact_time(self):  # time from setting to lifting a paw
         step_l = defaultdict(list)
-        for key, times_list in self.step_start_times.items():
-            for ind in range(len(times_list)):
-                try:
-                    dur = self.step_lift_times[key][ind] - self.step_start_times[key][ind]
-                    step_l[key].append(dur)
-                except ValueError:
-                    warnings.warn('no. of steps and lifts prob. not same')
+        for seq in self.paw_order_by_time:
+            dur = seq.paw_seq[-1].time - seq.paw_seq[0].time
+            step_l[seq.paw_seq[0].name].append(dur)
 
         step_durations = {}
         for paw in step_l:
@@ -302,43 +304,44 @@ class FeatureContainer(object):
     def peak_slopes(self):
         asc = defaultdict(list)
         des = defaultdict(list)
-        starts = self.step_start_times
-        ends = self.step_lift_times
-        for key, peaks in self.peak_times.items():
+        for seq in self.paw_order_by_time:
             paw_asc = []
             paw_des = []
-            for ind, peak_t in enumerate(peaks):
-                peak_val = -1
-                for paw in self.paws_time_order[peak_t]:
-                    if paw.name == key:
-                        peak_val = np.amax(paw.area)
+            key = seq.name
 
-                asc_t = abs(peak_t - starts[key][ind])
-                asc_slope = peak_val / asc_t
-                paw_asc.append(asc_slope)
+            start_t = seq.start
+            peak_t = seq.peak_t
+            peak_val = seq.peak_val
+            end_t = seq.end
 
-                des_t = abs(peak_t - ends[key][ind])
-                des_slope = peak_val / des_t
-                paw_des.append(des_slope)
+            # ascend
+            asc_t = abs(peak_t - start_t)
+            asc_slope = peak_val / asc_t
+            paw_asc.append(asc_slope)
+
+            # descend
+            des_t = abs(peak_t - end_t)
+            des_slope = peak_val / des_t
+            paw_des.append(des_slope)
 
             asc[key].append(np.round(np.mean(paw_asc), 3))
             des[key].append(np.round(np.mean(paw_des), 3))
 
         self.asc_peak_slopes, self.des_peak_slopes = dict(asc), dict(des)
 
-    def step_length(self):  # spatial distance/length
+    def step_length(self):  # spatial distance/length between both paws alternating of one pair
         step_l = {}
-        for paw_name, glob_positions in self.peak_glob_positions.items():
+        for paw_key, seqs in self.paw_order_by_steps.items():
             step_dist = []
-            for pos_ind in range(len(glob_positions) - 1):
-                x1, y1 = self.peak_glob_positions[paw_name][pos_ind]
-                x2, y2 = self.peak_glob_positions[paw_name][pos_ind + 1]
+            for ind in range(len(seqs) - 1):
+                x1, y1 = seqs[ind].pos
+                x2, y2 = seqs[ind + 1].pos
                 x_square = abs(x2 - x1) * CELL_SIZE_MM / 1000
                 y_square = abs((y2 - y1)) * CELL_SIZE_MM / 1000
                 dist = round(math.sqrt(x_square ** 2 + y_square ** 2), 3)
                 step_dist.append(dist)
 
-            step_l[paw_name] = step_dist
+            step_l[paw_key] = step_dist
 
         self.step_lengths = step_l
 
@@ -369,26 +372,69 @@ class FeatureContainer(object):
             t_end = seq.end
             my_pos = seq.pos
             for other in seq.parallel:
-                if mylib.DIRECTION == 0:
-                    if my_pos[0] < other.pos[0]:  # 0 == backwards
-                        seq.was_front_of.append(other)
-                    else:
-                        seq.was_back_of.append(other)
+                # if mylib.DIRECTION == 0:  # independent of direction?
+                if my_pos[0] < other.pos[0]:  # 0 == backwards
+                    seq.was_front_of.append(other)
                 else:
-                    if my_pos[0] > other.pos[0]:  # 1 == forward
-                        seq.was_front_of.append(other)
-                    else:
-                        seq.was_back_of.append(other)
+                    seq.was_back_of.append(other)
+                # else:
+                #     if my_pos[0] > other.pos[0]:  # 1 == forward
+                #         seq.was_front_of.append(other)
+                #     else:
+                #         seq.was_back_of.append(other)
 
     def rename_seq(self):
-        # reset all names
+        # front = 0
+        # back = 0
+        most_upfront = self.paw_order_by_time[0].pos[0]  # order/start goes from 480 to 0 on matrix/mat
         for seq in self.paw_order_by_time:
-            paw_name_key = ''
-            for tframe in seq:
+            if seq is self.paw_order_by_time[0] and all(seq.peak_t < par.start for par in seq.parallel):  # first paw
+                seq.name = 'A'
+                paw_name_key = 'A'
+            elif seq is self.paw_order_by_time[-1]:  # last paw special case as this must be back paw
+                seq.name = 'C'
+                paw_name_key = 'C'
+            else:
+                if len(seq.was_front_of) > len(seq.was_back_of):  # front
+                    seq.name = 'A'
+                    paw_name_key = 'A'
+                    # if front % 2:
+                    #     paw_name_key = 'A'
+                    # else:
+                    #     paw_name_key = 'B'
+                    # front += 1
+                elif len(seq.was_front_of) < len(seq.was_back_of):  # back
+                    seq.name = 'C'
+                    paw_name_key = 'C'
+                    # if back % 2:
+                    #     paw_name_key = 'C'
+                    # else:
+                    #     paw_name_key = 'D'
+                    # back += 1
+                else:  # same length, e.g. same amount 'was overtaken' vs. 'overtook'
+                    if seq.pos[0] >= most_upfront:  # lower x coordinate means closer to end of mat--> further up front
+                        seq.name = 'C'
+                        paw_name_key = 'C'
+                    else:
+                        seq.name = 'A'
+                        paw_name_key = 'A'
+
+            if most_upfront > seq.pos[0]:
+                most_upfront = seq.pos[0]  # new frontmost paw position
+
+            for tframe in seq.paw_seq:  # rename whole step sequence according to new name
                 tframe.name = paw_name_key
 
+    def group_by_paws(self):
+        dic = defaultdict(list)
+        for seq in self.paw_order_by_time:
+            key = seq.name
+            dic[key].append(seq)
 
-def visualize_data(feature_container, visuals=False, total_view=False, mx_start=0, mx_skip=1, vis_from=0):
+        self.paw_order_by_steps = dict(dic)
+
+
+def visualize_data(data, visuals=False, total_view=False, mx_start=0, mx_skip=1, vis_from=0, paws=True):
     if not visuals:
         return
     np.set_printoptions(threshold=sys.maxsize)
@@ -401,13 +447,17 @@ def visualize_data(feature_container, visuals=False, total_view=False, mx_start=
     ax_global = ax[1]
     ax_global.set_title('global')
     ax_total = ax[2]
+    ax_total.set_title('total')
     total_mx = np.zeros((481, 64))
-    plt.axis('off')
+    # plt.axis('off')
 
-    fig_paws, axes_paws = plt.subplots(2, 2)
-    plt.figure(fig_paws)
+    plt.figure(fig)
+    if paws:
+        fig_paws, axes_paws = plt.subplots(2, 2)
+        plt.figure(fig_paws)
+    else:
+        fig_paws, axes_paws = None, None
 
-    data = feature_container.paws_time_order
     mx_ctr = mx_start
     for ground_paws in data[mx_ctr:]:
         global_mx = np.zeros((481, 64))
@@ -419,7 +469,8 @@ def visualize_data(feature_container, visuals=False, total_view=False, mx_start=
         total_mx += global_mx
 
         if visuals and mx_ctr % mx_skip == 0 and mx_ctr >= vis_from:
-            vis_paws(ground_paws, fig_paws, axes_paws)
+            if paws:
+                vis_paws(ground_paws, fig_paws, axes_paws, mx_ctr)
 
             # local
             # if mx_np.any():
@@ -432,33 +483,38 @@ def visualize_data(feature_container, visuals=False, total_view=False, mx_start=
             ax_global.set_axis_off()
 
             # total (drains performance heavily)
-            if total_view:
+            if total_view and mx_ctr % 50 == 0:
                 ax_total.imshow(total_mx)
-                ax_total.set_title('total')
+                # ax_total.set_title('total')
 
         mx_ctr += 1
 
 
-def vis_paws(data_obj, figure, axes):
-    plt.ion()
+def vis_paws(data_obj, figure, axes, mx_ctr):
+    # plt.ion()
     plt.figure(figure)
+    mod_ctr = 0
+    no_2_name = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
     ax_2_name = {'A': (0, 0), 'B': (0, 1), 'C': (1, 0), 'D': (1, 1)}
-    paws_shown = []
+    axes_used = []
 
     for paw in data_obj:
+        ax = ax_2_name[no_2_name[mod_ctr % 4]]
+        mod_ctr += 1
+        name = paw.name
+        axes_used.append(ax)
         try:
-            name = paw.name
-            paws_shown.append(name)
             if paw.valid:
-                axes[ax_2_name[name]].matshow(paw.area)
+                axes[ax].matshow(paw.area)
+                axes[ax].set_title(name)
+                axes[ax].set_axis_off()
+                figure.suptitle(mx_ctr)
         except TypeError:
             print(traceback.format_exc())
             print('err in:', paw.area)
 
-    for key in ax_2_name.keys():
-        axes[ax_2_name[key]].set_title(key)
-        axes[ax_2_name[key]].set_axis_off()
-        if key not in paws_shown:
-            axes[ax_2_name[key]].cla()
+    for axis in ax_2_name.values():
+        if axis not in axes_used:
+            axes[axis].cla()
 
     plt.pause(0.000001)

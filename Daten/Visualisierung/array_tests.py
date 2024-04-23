@@ -11,11 +11,12 @@ b = np.array([[0, 0, 0, 0, 0, 0],
               [1, 25, 26, 27, 28, 0],
               [1, 0, 0, 0, 0, 0]])
 
+
+class Test(object):
+    def __init__(self):
+        self.i = 0
+
+
 if __name__ == '__main__':
     csv_file = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\dog_features_data.csv'
     base_dir = r'C:\Users\jonas\OneDrive\Desktop\Studium_OvGU\WiSe23_24\BA\Daten\Rohdaten'
-
-    fig, ax = plt.subplots(1, 1)
-    ax.imshow([[]])
-    plt.pause(0.01)
-
