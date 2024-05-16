@@ -40,12 +40,21 @@ def get_rel_attr_as_dict(feature_container):  # only copy features relevant for 
 
     for attr, val in vars(feature_container).items():
         if attr in relevant:
-            for paw_val in val:
+            for paw_val in val:  # for every paw (key or pair)
                 key = attr + '_' + paw_val  # save feature for each paw
                 features[key] = np.round(np.median(val[paw_val]), 3)  # allow for each paw only one number
+                key = 'std_' + key
+                features[key] = np.round(np.std(val[paw_val]), 3)
 
     features['dog_id'] = feature_container.dog_id
     features['pace'] = feature_container.pace
+
+    try:
+        features['steps_A'] = feature_container.no_of_steps['A']  # Todo: temporary
+        features['steps_C'] = feature_container.no_of_steps['C']
+    except KeyError as ke:
+        print(ke.args)
+
     return features
 
 

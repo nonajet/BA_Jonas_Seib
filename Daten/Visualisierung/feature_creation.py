@@ -57,7 +57,7 @@ class FeatureContainer(object):
 
         # misc
         self.no_of_steps = {}
-        # self.peak_pressure = {}
+        self.peak_pressure = {}  # todo: include and rerun
         self.step_lengths = {}  # in m
         self.step_length_no_of_matrices = {}  # in no. of matrices
         self.avg_pres = {}
@@ -108,9 +108,9 @@ class FeatureContainer(object):
         self.group_by_paws()  # usable again
 
         # feature calculation
-        if not self.count_steps_glob_pos():
-            return False
-        # self.calc_glob_pos_of_steps()
+        err = self.count_steps_glob_pos()
+        if not err:
+            return err
         self.step_contact_time()
         self.calc_peak_times()
         # self.air_time()
@@ -181,8 +181,6 @@ class FeatureContainer(object):
                 paw_data_per_paw_step[key].append(step[key])
                 step[key] = []
 
-        for i in range(len(paw_name_per_step)):
-            print(i, paw_name_per_step[i])
         return dict(paw_data_per_paw_step)  # , paw_name_per_step
 
     def calc_glob_pos_of_steps(self):
@@ -211,9 +209,11 @@ class FeatureContainer(object):
             lift_times[paw_key].append(seq.end)
             lift_glob_pos[paw_key].append(seq.paw_seq[-1].global_pos)
 
+        step_ctr = []
         for val in steps:  # at least 2 steps per paw must be detected
+            step_ctr.append(steps[val])
             if steps[val] < 2:
-                return False
+                return -1
 
         self.no_of_steps = dict(steps)
         self.step_start_times = dict(step_times)
@@ -221,6 +221,11 @@ class FeatureContainer(object):
 
         self.step_start_glob_pos = dict(start_glob_pos)
         self.step_lift_glob_pos = dict(lift_glob_pos)
+
+        if abs(max(step_ctr) - min(step_ctr)) >= 2:
+            print('difference in step count too high -- {} to {}'.format(max(step_ctr), min(step_ctr)))
+            return -2
+
         return True
 
     def region_properties(self):
@@ -316,11 +321,13 @@ class FeatureContainer(object):
 
             # ascend
             asc_t = abs(peak_t - start_t)
+            if not asc_t: asc_t = 1
             asc_slope = peak_val / asc_t
             paw_asc.append(asc_slope)
 
             # descend
             des_t = abs(peak_t - end_t)
+            if not des_t: des_t = 1
             des_slope = peak_val / des_t
             paw_des.append(des_slope)
 
@@ -472,18 +479,12 @@ def visualize_data(data, visuals=False, total_view=False, mx_start=0, mx_skip=1,
             if paws:
                 vis_paws(ground_paws, fig_paws, axes_paws, mx_ctr)
 
-            # local
-            # if mx_np.any():
-            #     ax_local.imshow(mx_np)
-            #     ax_local.set_axis_off()
-            # ax_local.imshow(np.flipud(np.fliplr(mx_np)))  # rot. 180° to fit glob. view direction
-
             # global
             ax_global.imshow(global_mx)
             ax_global.set_axis_off()
 
             # total (drains performance heavily)
-            if total_view and mx_ctr % 50 == 0:
+            if total_view and mx_ctr % 4 == 0:
                 ax_total.imshow(total_mx)
                 # ax_total.set_title('total')
 
